@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>豊島区ごみ収集カレンダー(非公式)</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #23272e;
+    --sub: #7a8089;
+    --line: #e6e8ee;
+    --accent: #0d9488;
+    --seg-bg: #e8eaf0;
+    --today-bg: #fff5ec;
+    --today-line: #f2c39e;
+    --c-burnable: #d9532f;
+    --c-bottle: #22894f;
+    --c-paper: #2670c2;
+    --c-metal: #7a55b8;
+    --c-sodai: #b0791f;
+    --c-kyoten: #0d9488;
+    --c-no: #98552d;
+    --t-burnable: rgba(217,83,47,.12);
+    --t-bottle: rgba(34,137,79,.12);
+    --t-paper: rgba(38,112,194,.11);
+    --t-metal: rgba(122,85,184,.12);
+    --t-sodai: rgba(176,121,31,.13);
+    --t-kyoten: rgba(13,148,136,.11);
+    --t-no: rgba(152,85,45,.12);
+    --shadow: 0 1px 3px rgba(15,20,30,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1114;
+    --card: #191c21;
+    --text: #eceef1;
+    --sub: #969da8;
+    --line: #2a2e36;
+    --accent: #2dd4bf;
+    --seg-bg: #23272e;
+    --today-bg: #2b2119;
+    --today-line: #6b4a2e;
+    --c-burnable: #ff8763;
+    --c-bottle: #55c284;
+    --c-paper: #6aa9ec;
+    --c-metal: #b295e3;
+    --c-sodai: #d9a44a;
+    --c-kyoten: #2dd4bf;
+    --c-no: #d98d63;
+    --t-burnable: rgba(255,135,99,.15);
+    --t-bottle: rgba(85,194,132,.15);
+    --t-paper: rgba(106,169,236,.14);
+    --t-metal: rgba(178,149,227,.15);
+    --t-sodai: rgba(217,164,74,.15);
+    --t-kyoten: rgba(45,212,191,.13);
+    --t-no: rgba(217,141,99,.15);
+    --shadow: none;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding-bottom: calc(66px + env(safe-area-inset-bottom));
+  }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 12px 14px 32px; }
+  /* 月間カレンダー表示中は画面幅いっぱいまで使う */
+  .wrap.full { max-width: 1700px; }
+  header.app {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 2px 12px; gap: 8px;
+  }
+  header.app h1 { font-size: 17px; font-weight: 800; letter-spacing: .01em; }
+  .hdr-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+  .icon-btn {
+    height: 34px; padding: 0 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    line-height: 1; cursor: pointer; white-space: nowrap;
+  }
+  .area-btn {
+    font-size: 12px; font-weight: 600; color: var(--accent);
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 999px; padding: 7px 13px;
+    font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .card {
+    background: var(--card); border-radius: 16px;
+    border: 1px solid var(--line);
+    padding: 16px; margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .area-name { font-size: 12px; color: var(--sub); margin-bottom: 10px; }
+
+  /* 品目カラー: 各要素に品目クラスを付けると --col / --tint が決まる */
+  .burnable          { --col: var(--c-burnable); --tint: var(--t-burnable); }
+  .bottleCanPet      { --col: var(--c-bottle);   --tint: var(--t-bottle); }
+  .paperPlastic      { --col: var(--c-paper);    --tint: var(--t-paper); }
+  .metalCeramicGlass { --col: var(--c-metal);    --tint: var(--t-metal); }
+  .cat-sodai         { --col: var(--c-sodai);    --tint: var(--t-sodai); }
+  .cat-kyoten        { --col: var(--c-kyoten);   --tint: var(--t-kyoten); }
+  .cat-no            { --col: var(--c-no);       --tint: var(--t-no); }
+
+  /* ── 今日の収集バナー ── */
+  .today-banner {
+    border: 1px solid var(--today-line);
+    background: var(--today-bg);
+  }
+  .banner-label { font-size: 12px; font-weight: 700; color: var(--sub); letter-spacing: .04em; margin-bottom: 4px; }
+  .banner-main { font-size: 22px; font-weight: 800; line-height: 1.3; }
+  .banner-items { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 13px; font-weight: 700;
+    padding: 6px 12px; border-radius: 999px;
+    background: var(--tint); color: var(--col);
+  }
+  .chip svg { width: 15px; height: 15px; flex: none; }
+  .deadline { margin-top: 10px; font-size: 14px; font-weight: 600; }
+  .deadline .warn { color: var(--c-burnable); font-weight: 700; }
+
+  /* ── 表示切替(2週間/月間) ── */
+  .seg {
+    display: flex; background: var(--seg-bg); border-radius: 12px;
+    padding: 3px; margin: 4px 0 12px;
+  }
+  .seg button {
+    flex: 1; font-size: 14px; font-weight: 700; font-family: inherit;
+    padding: 8px 0; border: none; border-radius: 9px;
+    background: none; color: var(--sub); cursor: pointer;
+  }
+  .seg button.on {
+    background: var(--card); color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,.14);
+  }
+
+  /* ── 2週間リスト ── */
+  .sched-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 2px; border-bottom: 1px solid var(--line);
+  }
+  .sched-row:last-child { border-bottom: none; }
+  /* 通常行と完全に同じ寸法のまま背景色だけ変える(ズレ防止) */
+  .sched-row.is-today {
+    background: var(--today-bg); border-radius: 10px;
+  }
+  .sched-date { flex: 0 0 84px; font-size: 14px; font-weight: 700; padding-top: 3px; }
+  .sched-date .wd { font-size: 12px; color: var(--sub); font-weight: 600; }
+  .sched-date .wd.sat { color: var(--c-paper); }
+  .sched-date .wd.sun { color: var(--c-burnable); }
+  .sched-items { display: flex; flex-wrap: wrap; gap: 5px; }
+  .sched-none { font-size: 12px; color: var(--sub); padding-top: 4px; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 700; padding: 4px 9px;
+    border-radius: 7px; background: var(--tint); color: var(--col);
+  }
+  .tag svg { width: 13px; height: 13px; flex: none; }
+
+  /* ── 月間カレンダー ── */
+  /* 月ナビと操作(今日へ/縦横/印刷)を1行にまとめて縦のスペースを節約 */
+  .cal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px; margin-bottom: 10px; padding: 0 4px;
+  }
+  .cal-head .nav { display: flex; align-items: center; gap: 8px; }
+  .cal-head .tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .cal-head .title { font-size: 16px; font-weight: 800; }
+  .cal-head .nav button {
+    font-size: 18px; width: 36px; height: 36px; line-height: 1;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--card); color: var(--text); cursor: pointer;
+  }
+  .cal-card { padding: 14px 6px; }
+  .tbtn {
+    font-family: inherit; font-size: 12px; font-weight: 700;
+    padding: 7px 12px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    white-space: nowrap;
+  }
+  table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.cal th { font-size: 11px; color: var(--sub); padding-bottom: 5px; font-weight: 700; }
+  table.cal th.sun { color: var(--c-burnable); }
+  table.cal th.sat { color: var(--c-paper); }
+  /* セルの height は最低値。テーブル全体には fitCalendar() が
+     画面の残り高さを与えるので、行はそれに合わせて均等に伸びる */
+  table.cal td {
+    vertical-align: top; text-align: center;
+    height: 76px; padding: 3px 2px;
+    border-top: 1px solid var(--line);
+  }
+  table.cal td .d { font-size: 14px; font-weight: 700; }
+  table.cal td.other .d { color: var(--line); }
+  table.cal td.today {
+    background: var(--today-bg); border-radius: 10px;
+    box-shadow: inset 0 0 0 1.5px var(--today-line);
+  }
+  table.cal td.today .d { color: var(--c-burnable); font-weight: 800; }
+  .cal-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    margin-top: 3px; padding: 4px 2px 5px; border-radius: 8px;
+    background: var(--tint); color: var(--col);
+  }
+  .cal-item svg { width: 16px; height: 16px; flex: none; }
+  .cal-item .cl {
+    font-size: 9px; font-weight: 800; line-height: 1.25;
+    word-break: break-all;
+  }
+  /* 画面に収まらないときに fitCalendar() が付ける縮小モード */
+  table.cal.cal-dense td { height: 40px; }
+  table.cal.cal-dense td .d { font-size: 12px; }
+  table.cal.cal-dense .cal-item { padding: 2px 1px 3px; margin-top: 2px; gap: 1px; border-radius: 6px; }
+  table.cal.cal-dense .cal-item svg { width: 12px; height: 12px; }
+  table.cal.cal-dense .cal-item .cl { font-size: 8px; }
+
+  /* ── 地域選択 ── */
+  .setup .step-title { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
+  .opt-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opt-grid button {
+    font-size: 15px; font-weight: 600; font-family: inherit;
+    padding: 10px 16px; border-radius: 11px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    cursor: pointer;
+  }
+  .opt-grid button:active { background: var(--seg-bg); }
+  .opt-list { display: flex; flex-direction: column; gap: 8px; }
+  .opt-list button {
+    font-size: 14px; font-family: inherit; text-align: left;
+    padding: 12px 14px; border-radius: 11px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    cursor: pointer; line-height: 1.45;
+  }
+  .opt-list button .zone-note { display: block; font-size: 12px; color: var(--sub); margin-top: 3px; }
+  .back-link {
+    display: inline-block; margin-bottom: 12px;
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    background: none; border: none; font-family: inherit; cursor: pointer; padding: 4px 0;
+  }
+
+  /* ── アコーディオン(details) 共通 ── */
+  details.acc {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; margin-bottom: 8px; overflow: hidden;
+  }
+  details.acc > summary {
+    list-style: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 12px 14px; font-size: 14px; font-weight: 700;
+  }
+  details.acc > summary::-webkit-details-marker { display: none; }
+  details.acc > summary::after {
+    content: ""; flex: none; width: 8px; height: 8px;
+    border-right: 2px solid var(--sub); border-bottom: 2px solid var(--sub);
+    transform: rotate(45deg); transition: transform .15s; margin-left: 4px;
+  }
+  details.acc[open] > summary::after { transform: rotate(-135deg); }
+  details.acc .acc-body {
+    padding: 2px 14px 14px; font-size: 14px;
+    border-top: 1px solid var(--line); padding-top: 10px;
+  }
+  .rich { word-break: break-word; }
+  .rich a { color: var(--accent); }
+
+  /* ── 分別辞典 ── */
+  .search-box {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+  }
+  .search-box svg { width: 18px; height: 18px; color: var(--sub); flex: none; }
+  .search-box input {
+    flex: 1; border: none; background: none; color: var(--text);
+    font-size: 16px; font-family: inherit; outline: none;
+  }
+  .cat-chips {
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px;
+    margin-bottom: 8px; -webkit-overflow-scrolling: touch;
+  }
+  .cat-chips button {
+    flex: none; font-size: 12px; font-weight: 700; font-family: inherit;
+    padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--sub);
+    white-space: nowrap;
+  }
+  .cat-chips button.on { border-color: var(--accent); color: var(--accent); background: var(--t-kyoten); }
+  .kana-header {
+    font-size: 13px; font-weight: 800; color: var(--sub);
+    padding: 12px 4px 6px;
+  }
+  .jiten-badge {
+    flex: none; font-size: 11px; font-weight: 700; padding: 3px 8px;
+    border-radius: 6px; background: var(--tint); color: var(--col);
+    white-space: nowrap;
+  }
+  .jiten-name { flex: 1; min-width: 0; }
+  .jiten-count { font-size: 12px; color: var(--sub); margin: 2px 4px 8px; }
+  .detail-label { font-size: 11px; font-weight: 700; color: var(--sub); margin: 8px 0 2px; letter-spacing: .04em; }
+
+  /* ── 便利帳 ── */
+  .benri-img { width: 100%; border-radius: 8px; display: block; }
+  .benri-links { margin-top: 10px; font-size: 13px; }
+  .benri-links a { color: var(--accent); word-break: break-all; }
+
+  /* ── メニュー ── */
+  .menu-list { display: flex; flex-direction: column; gap: 8px; }
+  .menu-list button {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: 15px; font-weight: 700; font-family: inherit; text-align: left;
+    padding: 14px 16px; border-radius: 12px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+  }
+  .menu-list button::after {
+    content: ""; flex: none; width: 8px; height: 8px;
+    border-right: 2px solid var(--sub); border-bottom: 2px solid var(--sub);
+    transform: rotate(-45deg);
+  }
+  .menu-list .menu-note { display: block; font-size: 11px; font-weight: 500; color: var(--sub); margin-top: 2px; }
+  .page-title { font-size: 18px; font-weight: 800; margin: 2px 2px 12px; }
+  .section-title { font-size: 14px; font-weight: 800; color: var(--sub); margin: 16px 2px 8px; }
+  .contact-title { font-size: 15px; font-weight: 800; }
+  .contact-org { font-size: 13px; color: var(--sub); margin-top: 1px; }
+  .news-date { font-size: 12px; color: var(--sub); font-weight: 700; }
+  .news-new { color: var(--c-burnable); font-size: 11px; font-weight: 800; margin-left: 6px; }
+  .snapshot-note {
+    font-size: 12px; color: var(--sub); background: var(--seg-bg);
+    border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; line-height: 1.6;
+  }
+  .snapshot-note a { color: var(--accent); }
+
+  /* ── 下部タブバー ── */
+  #tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: var(--card); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #tabbar .inner {
+    max-width: 520px; margin: 0 auto; display: flex;
+  }
+  #tabbar button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px 0 6px; border: none; background: none; cursor: pointer;
+    color: var(--sub); font-family: inherit; font-size: 10px; font-weight: 700;
+  }
+  #tabbar button svg { width: 22px; height: 22px; }
+  #tabbar button.on { color: var(--accent); }
+
+  footer {
+    margin-top: 20px; font-size: 11px; color: var(--sub);
+    text-align: center; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+
+  /* ── PC など広い画面では全体を拡大 ── */
+  @media (min-width: 700px) {
+    .wrap { max-width: 900px; padding: 20px 24px 48px; }
+    header.app h1 { font-size: 24px; }
+    .icon-btn { height: 42px; padding: 0 16px; font-size: 14px; }
+    .area-btn { font-size: 14px; padding: 9px 18px; }
+    .area-name { font-size: 15px; }
+    .card { padding: 24px; border-radius: 20px; }
+    .banner-label { font-size: 14px; }
+    .banner-main { font-size: 30px; }
+    .chip { font-size: 16px; padding: 8px 16px; }
+    .chip svg { width: 19px; height: 19px; }
+    .deadline { font-size: 17px; }
+    .sched-row { padding: 11px 4px; }
+    .sched-date { flex: 0 0 118px; font-size: 17px; }
+    .sched-date .wd { font-size: 15px; }
+    .sched-none { font-size: 14px; }
+    .tag { font-size: 15px; padding: 6px 12px; }
+    .tag svg { width: 16px; height: 16px; }
+    .seg button { font-size: 16px; padding: 10px 0; }
+    .cal-head .title { font-size: 20px; }
+    .cal-head .nav button { font-size: 22px; width: 44px; height: 44px; }
+    .cal-card { padding: 24px 16px; }
+    table.cal th { font-size: 14px; padding-bottom: 8px; }
+    table.cal td { height: 96px; padding: 6px 4px; }
+    table.cal td .d { font-size: 18px; }
+    .cal-item { padding: 7px 4px 8px; margin-top: 5px; border-radius: 10px; gap: 3px; }
+    .cal-item svg { width: 24px; height: 24px; }
+    .cal-item .cl { font-size: 13px; }
+    .tbtn { font-size: 14px; padding: 9px 16px; }
+    .setup .step-title { font-size: 19px; }
+    .opt-grid button { font-size: 17px; padding: 12px 20px; }
+    .opt-list button { font-size: 16px; padding: 14px 18px; }
+    details.acc > summary { font-size: 16px; padding: 15px 18px; }
+    details.acc .acc-body { font-size: 15px; padding: 12px 18px 16px; }
+    .search-box input { font-size: 17px; }
+    .cat-chips button { font-size: 14px; padding: 8px 15px; }
+    .menu-list button { font-size: 17px; padding: 17px 20px; }
+    .page-title { font-size: 22px; }
+    #tabbar .inner { max-width: 900px; }
+    #tabbar button { font-size: 12px; padding: 10px 0 8px; }
+    #tabbar button svg { width: 26px; height: 26px; }
+    footer { font-size: 13px; }
+  }
+
+  /* ── 印刷: カレンダー(または表示中のリスト)だけを紙に出す ──
+     ダークモード中でも紙は白なので、印刷時はライト配色を強制する */
+  @media print {
+    :root, :root[data-theme="dark"] {
+      --bg: #fff; --card: #fff; --text: #1a1a1a; --sub: #555; --line: #bbb;
+      --seg-bg: #eee; --today-bg: #fff3e6; --today-line: #e0b184;
+      --c-burnable: #c74b28; --c-bottle: #1e7a46; --c-paper: #2264ad; --c-metal: #6d4aa5;
+      --c-sodai: #9c6a1a; --c-kyoten: #0b7f75; --c-no: #8a4c27;
+      --t-burnable: rgba(217,83,47,.14); --t-bottle: rgba(34,137,79,.14);
+      --t-paper: rgba(38,112,194,.13); --t-metal: rgba(122,85,184,.14);
+      --t-sodai: rgba(176,121,31,.15); --t-kyoten: rgba(13,148,136,.13);
+      --t-no: rgba(152,85,45,.14);
+      --shadow: none;
+    }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background: #fff; padding: 0; }
+    #tabbar, header.app, .seg, .today-banner, footer,
+    .cal-head .tools, .cal-head .nav button { display: none !important; }
+    .wrap { max-width: none; padding: 0; }
+    .card { border: none; box-shadow: none; margin: 0; padding: 0; }
+    .cal-card { padding: 0; }
+    .cal-head { justify-content: center; margin-bottom: 4mm; }
+    .cal-head .title { font-size: 14pt; }
+    .area-name { font-size: 10pt; margin-bottom: 3mm; }
+
+    /* 印刷時のカレンダー寸法は画面用(700px以上の拡大指定を含む)を上書きする。
+       テーブル自体に「A4の印刷可能領域からヘッダー分を引いた高さ」をmm指定する
+       ことで、行が均等に引き伸ばされて用紙いっぱいに印刷される。
+       (縦長→A4縦: 277mm−ヘッダー≈17mm → 252mm / 横長→A4横: 190mm−17mm → 166mm) */
+    /* fitCalendar() が画面用にインラインstyleで高さを入れるため、
+       印刷時は !important で用紙サイズの高さを優先させる。
+       高さは下の orientation メディアクエリで用紙の向きに合わせて決まる */
+    table.cal { page-break-inside: avoid; }
+    table.cal td { height: auto; padding: 1.5mm 1mm; }
+    table.cal td .d { font-size: 12pt; }
+    table.cal th { font-size: 10pt; padding: 1.5mm 0; }
+    .cal-item { padding: 1mm 0.6mm 1.2mm; margin-top: 1mm; gap: 0.5mm; border-radius: 1.5mm; }
+    .cal-item svg { width: 4.5mm; height: 4.5mm; }
+    .cal-item .cl { font-size: 8pt; }
+    /* 紙のカレンダーらしく全セルに罫線を引く */
+    table.cal td, table.cal th { border: 0.5pt solid #999; }
+
+    /* 「今日」の印は印刷しない(月をまたいで使う紙なので意味を持たない) */
+    table.cal td.today {
+      background: none; box-shadow: none; border-radius: 0;
+    }
+    table.cal td.today .d {
+      color: inherit; font-weight: 700;
+    }
+    .sched-row.is-today { background: none; }
+  }
+  /* 印刷設定で選んだ用紙の向きに追従して、どちらでも1枚いっぱいに広げる。
+     印刷時のメディアクエリは「用紙」の縦横で評価される。
+     (A4・余白10mm想定: 縦=277mm、横=190mm からヘッダー分を引いた高さ) */
+  @media print and (orientation: portrait) {
+    table.cal { height: 252mm !important; }
+  }
+  @media print and (orientation: landscape) {
+    table.cal { height: 166mm !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<nav id="tabbar"><div class="inner">
+  <button data-tab="cal">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg>
+    カレンダー
+  </button>
+  <button data-tab="jiten">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    分別辞典
+  </button>
+  <button data-tab="benri">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 2h2v6l-1-.75L11 10V4z"/></svg>
+    便利帳
+  </button>
+  <button data-tab="menu">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z"/></svg>
+    メニュー
+  </button>
+</div></nav>
+
+<script>
+"use strict";
+
+/* =====================================================================
+ * 収集曜日データ (toshima-gomi.json をインライン化)
+ * 出典: 豊島区「資源回収・ごみ収集曜日一覧(50音順)」令和8年4月発行
+ * file:// で開いても動くよう fetch は使わず埋め込みにしている。
+ * 元の toshima-gomi.json を更新したら、この定数も同期させること。
+ * ===================================================================== */
+const DATA = /* __GOMI_DATA__ */ null;
+
+/* =====================================================================
+ * 公式Webアプリ相当のコンテンツ (2026-08-02 取得スナップショット)
+ * 出典: 豊島区ごみ分別アプリWeb版 (manage.delight-system.com/threeR)
+ *  - jiten:    分別辞典 774品目 {kana,name,cat,note,kw}
+ *  - faq:      よくある質問 {cat,q,a(HTML)}
+ *  - contacts: 粗大ごみ申込/家電等処分/食べきり協力店/お問い合わせ先
+ *  - news:     区からのお知らせ(取得時点のスナップショット)
+ *  - benri:    便利帳(分け方・出し方ポスター画像 data URI)
+ * ===================================================================== */
+const APP_DATA = /* __MASTER__ */ null;
+
+/* ---------- 定数 ---------- */
+// Date#getDay() は 0=日曜。データ側の曜日キーに合わせるためのマップ。
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const WEEKDAY_JP = ["日", "月", "火", "水", "木", "金", "土"];
+
+// カレンダーには凡例(注釈)を置かないため、セル内でも省略せずこの正式名称を
+// そのまま表示する(CSS側で折り返し)。
+const CATEGORIES = {
+  burnable:          { name: "燃やすごみ" },
+  bottleCanPet:      { name: "びん・かん・ペットボトル" },
+  paperPlastic:      { name: "段ボール・紙・布類/プラスチック" },
+  metalCeramicGlass: { name: "金属・陶器・ガラスごみ" },
+};
+const CATEGORY_ORDER = ["burnable", "bottleCanPet", "paperPlastic", "metalCeramicGlass"];
+
+// 品目アイコン(自前SVG・currentColorで文字色に追従)。
+// 絵文字は環境で見た目が変わり意味も伝わりにくいためシルエットを描画している。
+// bottleCanPet = びん+かん、paperPlastic = 段ボール箱+ペット容器の組み合わせ。
+const ICONS = {
+  burnable:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>',
+  bottleCanPet:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 2h2.8v2.6l1.1 2.1c.2.4.3.8.3 1.2V20c0 .9-.7 1.6-1.6 1.6H6.8c-.9 0-1.6-.7-1.6-1.6V7.9c0-.4.1-.8.3-1.2l1.1-2.1V2z"/><path fill-rule="evenodd" d="M15 6.8h4.6c.7 0 1.2.5 1.2 1.2v12.4c0 .7-.5 1.2-1.2 1.2H15c-.7 0-1.2-.5-1.2-1.2V8c0-.7.5-1.2 1.2-1.2zm-1.2 2.7h7v1.1h-7V9.5z"/></svg>',
+  paperPlastic:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.5 9.2 4.6 5.9h2.8L6 9.2H2.5z"/><path d="M13.5 9.2 11.4 5.9H8.6l1.4 3.3h3.5z"/><path fill-rule="evenodd" d="M2.5 10.2h11v9.3c0 .6-.5 1.1-1.1 1.1H3.6c-.6 0-1.1-.5-1.1-1.1v-9.3zm4.9 0h1.2v10.4H7.4V10.2z"/><path d="M17.1 4.6h2.8c.3 0 .5.2.5.5v.9c0 .3-.2.5-.5.5h-2.8c-.3 0-.5-.2-.5-.5v-.9c0-.3.2-.5.5-.5z"/><path d="M16.2 8.6c0-.9.5-1.6 1.3-1.9h2c.8.3 1.3 1 1.3 1.9v1.6c0 .6-.3 1-.3 1.6s.3 1 .3 1.6v5.2c0 .9-.7 1.6-1.6 1.6h-1.4c-.9 0-1.6-.7-1.6-1.6v-5.2c0-.6.3-1 .3-1.6s-.3-1-.3-1.6V8.6z"/></svg>',
+  metalCeramicGlass:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>',
+};
+
+// 分別辞典の分別区分 → 色クラス。
+// プラと段ボール・紙・布類は同じ収集日なので同色(paperPlastic)。
+const JITEN_CAT_CLASS = {
+  "燃やすごみ": "burnable",
+  "資源（びん・かん・ペットボトル）": "bottleCanPet",
+  "資源（段ボール・紙・布類）": "paperPlastic",
+  "資源（プラスチック）": "paperPlastic",
+  "金属・陶器・ガラスごみ": "metalCeramicGlass",
+  "粗大ごみ": "cat-sodai",
+  "区施設等拠点回収": "cat-kyoten",
+  "収集できません": "cat-no",
+};
+// 辞典のカテゴリ絞り込みチップ(表示ラベル → cat文字列)
+const JITEN_FILTERS = [
+  ["すべて", ""],
+  ["燃やす", "燃やすごみ"],
+  ["びん・かん・ペット", "資源（びん・かん・ペットボトル）"],
+  ["段ボール・紙・布", "資源（段ボール・紙・布類）"],
+  ["プラ", "資源（プラスチック）"],
+  ["金属・陶器・ガラス", "金属・陶器・ガラスごみ"],
+  ["粗大ごみ", "粗大ごみ"],
+  ["拠点回収", "区施設等拠点回収"],
+  ["収集不可", "収集できません"],
+];
+
+const STORAGE_KEY = "toshimaGomi.areaId";
+const VIEW_KEY = "toshimaGomi.view";   // "twoweeks" | "month"
+const THEME_KEY = "toshimaGomi.theme"; // "auto" | "light" | "dark"
+const TAB_KEY = "toshimaGomi.tab";     // "cal" | "jiten" | "benri" | "menu"
+
+/* ---------- テーマ ---------- */
+const THEME_LABELS = { auto: "🌓 自動", light: "☀️ ライト", dark: "🌙 ダーク" };
+const THEME_ORDER = ["auto", "light", "dark"];
+
+function currentTheme() {
+  const t = localStorage.getItem(THEME_KEY);
+  return THEME_ORDER.includes(t) ? t : "auto";
+}
+// html要素の data-theme を必ず "light" か "dark" に確定させる。
+// auto のときだけ OS 設定(prefers-color-scheme)に追従する。
+function applyTheme() {
+  const t = currentTheme();
+  const dark = t === "dark" ||
+    (t === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+}
+function cycleTheme() {
+  const next = THEME_ORDER[(THEME_ORDER.indexOf(currentTheme()) + 1) % THEME_ORDER.length];
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme();
+}
+
+/* =====================================================================
+ * 「第n ◯曜日」判定 — このアプリの計算の要
+ *
+ * 豊島区の収集表にある「第1・3」は、
+ *   「その月に 1番目 / 3番目 に *来る* その曜日」
+ * という意味であり、「その月の第n週」や ISO 週番号とは無関係。
+ * 例: 月の1日が金曜なら、その日が「第1金曜」。カレンダー上の週の
+ * 区切り(日曜始まり等)がどうであっても影響しない。
+ *
+ * したがって判定は日付だけで決まる:
+ *   1〜7日  → その曜日として月内 1番目
+ *   8〜14日 → 2番目
+ *   15〜21日 → 3番目
+ *   22〜28日 → 4番目
+ *   29〜31日 → 5番目(豊島区に「第5」の収集は存在しないため、
+ *              データの nth に 5 が入らず自然に収集なしとなる)
+ * ===================================================================== */
+function nthOccurrenceOfWeekday(date) {
+  return Math.ceil(date.getDate() / 7);
+}
+
+/**
+ * 指定エリア・指定日に収集される品目キーの配列を返す(表示順)。
+ * burnable / bottleCanPet / paperPlastic は毎週(曜日配列)、
+ * metalCeramicGlass のみ「第n曜日」指定。
+ */
+function collectionsOn(area, date) {
+  const wd = WEEKDAY_KEYS[date.getDay()];
+  const result = [];
+  for (const key of CATEGORY_ORDER) {
+    if (key === "metalCeramicGlass") {
+      const spec = area.metalCeramicGlass;
+      if (spec.weekday === wd && spec.nth.includes(nthOccurrenceOfWeekday(date))) {
+        result.push(key);
+      }
+    } else if (area[key].includes(wd)) {
+      result.push(key);
+    }
+  }
+  return result;
+}
+
+/* ---------- 日付ユーティリティ ---------- */
+function today0() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+function addDays(date, n) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+}
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth() === b.getMonth() &&
+         a.getDate() === b.getDate();
+}
+function fmtDate(date) {
+  return `${date.getMonth() + 1}月${date.getDate()}日(${WEEKDAY_JP[date.getDay()]})`;
+}
+
+/** 締切時刻。繁華街(downtown)エリアのみ朝7:30、それ以外は朝8:00。 */
+function deadlineOf(area) {
+  return area.zone === "downtown"
+    ? DATA.meta.rules.deadlineDowntown
+    : DATA.meta.rules.deadlineNormal;
+}
+function isPastDeadline(area) {
+  const [h, m] = deadlineOf(area).split(":").map(Number);
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes() >= h * 60 + m;
+}
+
+/* ---------- 状態 ---------- */
+function loadArea() {
+  const id = localStorage.getItem(STORAGE_KEY);
+  return DATA.areas.find(a => a.id === id) || null;
+}
+const app = document.getElementById("app");
+let calYear, calMonth; // 表示中のカレンダー年月
+let tab = localStorage.getItem(TAB_KEY);
+if (!["cal", "jiten", "benri", "menu"].includes(tab)) tab = "cal";
+let menuPage = null;   // メニュータブ内のサブページ
+let jitenQuery = "";
+let jitenCat = "";
+
+/* ---------- エスケープ ---------- */
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+/* ---------- 共通ヘッダー ---------- */
+function headerHtml(withAreaBtn) {
+  return `<header class="app">
+    <h1>豊島区ごみ収集カレンダー</h1>
+    <div class="hdr-actions">
+      <button class="icon-btn" id="themeBtn" title="テーマ切替(自動/ライト/ダーク)">${THEME_LABELS[currentTheme()]}</button>
+      ${withAreaBtn ? `<button class="area-btn" id="changeArea">地域を変更</button>` : ""}
+    </div>
+  </header>`;
+}
+function bindHeader() {
+  const tb = document.getElementById("themeBtn");
+  if (tb) tb.onclick = () => {
+    cycleTheme();
+    tb.textContent = THEME_LABELS[currentTheme()];
+  };
+  const ca = document.getElementById("changeArea");
+  if (ca) ca.onclick = () => renderSetup("town");
+}
+function footerHtml() {
+  return `<footer>
+    非公式アプリです。最新情報は
+    <a href="https://www.city.toshima.lg.jp/" target="_blank" rel="noopener">豊島区公式サイト</a>
+    で確認してください。<br>
+    祝日も通常どおり収集(年末年始のみ休止)。荒天時は遅延・中止の場合があります。<br>
+    出典: ${esc(DATA.meta.source)} / 豊島区ごみ分別アプリWeb版(${esc(APP_DATA.fetchedAt)}取得)
+  </footer>`;
+}
+
+/* ---------- タブバー ---------- */
+function updateTabbar() {
+  document.querySelectorAll("#tabbar button").forEach(b =>
+    b.classList.toggle("on", b.dataset.tab === tab));
+}
+document.querySelectorAll("#tabbar button").forEach(b =>
+  b.onclick = () => {
+    tab = b.dataset.tab;
+    localStorage.setItem(TAB_KEY, tab);
+    menuPage = null;
+    render();
+  });
+
+function render() {
+  updateTabbar();
+  window.scrollTo(0, 0);
+  app.classList.remove("full");
+  if (tab === "cal") {
+    if (!loadArea()) { renderSetup("town"); return; }
+    renderCalView();
+  } else if (tab === "jiten") {
+    renderJiten();
+  } else if (tab === "benri") {
+    renderBenri();
+  } else {
+    renderMenu();
+  }
+}
+
+/* =====================================================================
+ * 地域選択フロー: 町名 → 丁目 → (番地条件があれば候補選択)
+ * ===================================================================== */
+function renderSetup(step, sel) {
+  sel = sel || {};
+  let html = headerHtml(false) + `<div class="setup">`;
+
+  if (step === "town") {
+    const towns = [...new Set(DATA.areas.map(a => a.town))];
+    html += `<div class="card">
+      <div class="step-title">お住まいの町名を選んでください</div>
+      <div class="opt-grid">` +
+      towns.map(t => `<button data-town="${esc(t)}">${esc(t)}</button>`).join("") +
+      `</div></div>`;
+  } else if (step === "chome") {
+    const chomes = [...new Set(
+      DATA.areas.filter(a => a.town === sel.town).flatMap(a => a.chome)
+    )].sort((x, y) => x - y);
+    html += `<button class="back-link" data-back="town">‹ 町名を選び直す</button>
+      <div class="card">
+      <div class="step-title">${esc(sel.town)} — 丁目を選んでください</div>
+      <div class="opt-grid">` +
+      chomes.map(c => `<button data-chome="${c}">${c}丁目</button>`).join("") +
+      `</div></div>`;
+  } else if (step === "banchi") {
+    const cands = DATA.areas.filter(a =>
+      a.town === sel.town && a.chome.includes(sel.chome));
+    html += `<button class="back-link" data-back="chome">‹ 丁目を選び直す</button>
+      <div class="card">
+      <div class="step-title">${esc(sel.town)}${sel.chome}丁目 — 番地を選んでください</div>
+      <div class="opt-list">` +
+      cands.map(a => {
+        const cond = a.banchiCondition || "全域";
+        const zone = a.zone === "downtown"
+          ? `<span class="zone-note">繁華街エリア(締切 朝7:30)</span>` : "";
+        return `<button data-area="${esc(a.id)}">${esc(cond)}${zone}</button>`;
+      }).join("") +
+      `</div></div>`;
+  }
+
+  html += `</div>` + footerHtml();
+  app.innerHTML = html;
+  bindHeader();
+
+  app.querySelectorAll("[data-town]").forEach(b =>
+    b.onclick = () => renderSetup("chome", { town: b.dataset.town }));
+  app.querySelectorAll("[data-chome]").forEach(b =>
+    b.onclick = () => {
+      const chome = Number(b.dataset.chome);
+      const cands = DATA.areas.filter(a =>
+        a.town === sel.town && a.chome.includes(chome));
+      if (cands.length === 1) {
+        selectArea(cands[0].id);
+      } else {
+        renderSetup("banchi", { town: sel.town, chome });
+      }
+    });
+  app.querySelectorAll("[data-area]").forEach(b =>
+    b.onclick = () => selectArea(b.dataset.area));
+  app.querySelectorAll("[data-back]").forEach(b =>
+    b.onclick = () => renderSetup(b.dataset.back, sel));
+}
+
+function selectArea(id) {
+  localStorage.setItem(STORAGE_KEY, id);
+  const t = today0();
+  calYear = t.getFullYear();
+  calMonth = t.getMonth();
+  render();
+}
+
+/* =====================================================================
+ * カレンダータブ
+ * ===================================================================== */
+function chipsHtml(items, cls) {
+  return items.map(k =>
+    `<span class="${cls} ${k}">${ICONS[k]}<span>${esc(CATEGORIES[k].name)}</span></span>`
+  ).join("");
+}
+
+function renderCalView() {
+  const area = loadArea();
+  const today = today0();
+  const todayItems = collectionsOn(area, today);
+  const view = localStorage.getItem(VIEW_KEY) || "twoweeks";
+  // 月間表示のときだけコンテナ幅の上限を外して画面いっぱいに使う
+  app.classList.toggle("full", view === "month");
+
+  let html = headerHtml(true) +
+    `<div class="area-name">📍 ${esc(area.label)}</div>`;
+
+  /* 今日の収集バナー */
+  if (todayItems.length) {
+    const past = isPastDeadline(area);
+    html += `<div class="card today-banner">
+      <div class="banner-label">今日 ${fmtDate(today)}</div>
+      <div class="banner-main">今日は ${todayItems.map(k => esc(CATEGORIES[k].name)).join("・")} の日</div>
+      <div class="banner-items">${chipsHtml(todayItems, "chip")}</div>
+      <div class="deadline">朝 ${deadlineOf(area)} までに出してください
+        ${past ? `<div class="warn">※締切時刻を過ぎています</div>` : ""}
+      </div>
+    </div>`;
+  }
+
+  /* 表示切替タブ */
+  html += `<div class="seg">
+    <button data-view="twoweeks" class="${view === "twoweeks" ? "on" : ""}">2週間</button>
+    <button data-view="month" class="${view === "month" ? "on" : ""}">月間</button>
+  </div>`;
+
+  if (view === "twoweeks") {
+    /* 今日から14日間すべての日を表示(収集がない日は「収集なし」) */
+    html += `<div class="card">`;
+    for (let i = 0; i < 14; i++) {
+      const d = addDays(today, i);
+      const items = collectionsOn(area, d);
+      const wdCls = d.getDay() === 0 ? "sun" : d.getDay() === 6 ? "sat" : "";
+      html += `<div class="sched-row${i === 0 ? " is-today" : ""}">
+        <div class="sched-date">${d.getMonth() + 1}/${d.getDate()}
+          <span class="wd ${wdCls}">(${WEEKDAY_JP[d.getDay()]})</span></div>
+        <div class="sched-items">${
+          items.length ? chipsHtml(items, "tag")
+                       : `<span class="sched-none">収集なし</span>`
+        }</div>
+      </div>`;
+    }
+    html += `</div>`;
+  } else {
+    /* 月間カレンダー(セル内にアイコン+品目名を表示するため凡例なし) */
+    html += `<div class="card cal-card">${calendarHtml(area, calYear, calMonth, today)}</div>`;
+  }
+
+  html += footerHtml();
+  app.innerHTML = html;
+  bindHeader();
+
+  app.querySelectorAll(".seg [data-view]").forEach(b =>
+    b.onclick = () => {
+      localStorage.setItem(VIEW_KEY, b.dataset.view);
+      renderCalView();
+    });
+  if (view === "month") {
+    document.getElementById("calPrev").onclick = () => {
+      calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; }
+      renderCalView();
+    };
+    document.getElementById("calNext").onclick = () => {
+      calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; }
+      renderCalView();
+    };
+    document.getElementById("calToday").onclick = () => {
+      const t = today0();
+      calYear = t.getFullYear();
+      calMonth = t.getMonth();
+      renderCalView();
+    };
+    document.getElementById("calPrint").onclick = () => window.print();
+    fitCalendar();
+  }
+}
+
+/**
+ * 画面表示用: カレンダーを画面にフィットさせる(さんあーる方式)。
+ * 画面の残り高さ(ビューポート − テーブル上端 − タブバー)いっぱいに広げる
+ * ので、画面の縦横(ウィンドウの形)にそのまま追従する。
+ * 高さ指定だけではセル内容が大きいと縮まないので、1行あたりの高さ予算が
+ * 足りないときは cal-dense クラスを付けてバッジ類を縮小し、確実に収める。
+ */
+function fitCalendar() {
+  const table = app.querySelector("table.cal");
+  if (!table) return;
+  const top = table.getBoundingClientRect().top + window.scrollY;
+  const tabbarH = document.getElementById("tabbar").offsetHeight;
+  const h = Math.max(window.innerHeight - top - tabbarH - 12, 280);
+  table.style.height = h + "px";
+  // 1行に使える高さ(曜日ヘッダーぶん約30pxを引く)が通常サイズの
+  // バッジに足りなければ縮小モードにする
+  const rows = table.tBodies[0].rows.length;
+  const perRow = (h - 30) / rows;
+  table.classList.toggle("cal-dense", perRow < 78);
+}
+window.addEventListener("resize", fitCalendar);
+
+/** 1日ぶんのセルHTML。day が null なら月の範囲外の空セル。 */
+function calCellHtml(area, year, month, day, today) {
+  if (!day) return `<td class="other"></td>`;
+  const d = new Date(year, month, day);
+  const items = collectionsOn(area, d);
+  const isToday = sameDay(d, today);
+  return `<td class="${isToday ? "today" : ""}">
+    <div class="d">${day}</div>` +
+    items.map(k =>
+      `<span class="cal-item ${k}">${ICONS[k]}<span class="cl">${esc(CATEGORIES[k].name)}</span></span>`
+    ).join("") +
+  `</td>`;
+}
+
+function calendarHtml(area, year, month, today) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // 月を週ごとの配列に分解(日曜始まり・空きは null)
+  const weeks = [];
+  let week = new Array(7).fill(null);
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dow = new Date(year, month, day).getDay();
+    week[dow] = day;
+    if (dow === 6 || day === daysInMonth) {
+      weeks.push(week);
+      week = new Array(7).fill(null);
+    }
+  }
+
+  let html = `<div class="cal-head">
+    <div class="nav">
+      <button id="calPrev" aria-label="前の月">‹</button>
+      <span class="title">${year}年${month + 1}月</span>
+      <button id="calNext" aria-label="次の月">›</button>
+    </div>
+    <div class="tools">
+      <button class="tbtn" id="calToday">今日へ</button>
+      <button class="tbtn" id="calPrint">🖨 印刷</button>
+    </div>
+  </div>`;
+
+  html += `<table class="cal"><thead><tr>` +
+    WEEKDAY_JP.map((w, i) =>
+      `<th class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</th>`).join("") +
+    `</tr></thead><tbody>` +
+    weeks.map(w =>
+      `<tr>${w.map(day => calCellHtml(area, year, month, day, today)).join("")}</tr>`
+    ).join("") +
+    `</tbody></table>`;
+  return html;
+}
+
+/* =====================================================================
+ * 分別辞典タブ (774品目・検索 + カテゴリ絞り込み)
+ * ===================================================================== */
+// 検索用の正規化: NFKC(全角英数→半角等) → 小文字 → ひらがな→カタカナ。
+// 公式アプリは「大文字化+全角化+カタカナ化」で data-keyword と部分一致させて
+// いるだけなので漢字品目は読みで探せないが、こちらは品目名の読み仮名(yomi)も
+// 検索対象に含めており「でんち」→乾電池 のような検索ができる。
+function toKatakana(s) {
+  return s.replace(/[ぁ-ん]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+}
+function normSearch(s) {
+  return toKatakana(s.normalize("NFKC").toLowerCase());
+}
+
+function jitenMatches() {
+  const q = normSearch(jitenQuery.trim());
+  return APP_DATA.jiten.filter(it => {
+    if (jitenCat && it.cat !== jitenCat) return false;
+    if (!q) return true;
+    return normSearch(it.name + " " + (it.yomi || "") + " " + it.kw).includes(q);
+  });
+}
+
+function jitenListHtml() {
+  const items = jitenMatches();
+  if (!items.length) {
+    return `<div class="jiten-count">該当する品目がありません</div>`;
+  }
+  let html = `<div class="jiten-count">${items.length}件</div>`;
+  let lastKana = null;
+  for (const it of items) {
+    if (it.kana !== lastKana) {
+      lastKana = it.kana;
+      html += `<div class="kana-header">${esc(it.kana)}</div>`;
+    }
+    const cls = JITEN_CAT_CLASS[it.cat] || "cat-no";
+    html += `<details class="acc">
+      <summary>
+        <span class="jiten-name">${esc(it.name)}</span>
+        <span class="jiten-badge ${cls}">${esc(it.cat)}</span>
+      </summary>
+      <div class="acc-body">
+        <div class="detail-label">分別区分</div>
+        <div><span class="jiten-badge ${cls}">${esc(it.cat)}</span></div>
+        ${it.note ? `<div class="detail-label">注意事項</div><div class="rich">${esc(it.note)}</div>` : ""}
+      </div>
+    </details>`;
+  }
+  return html;
+}
+
+function renderJiten() {
+  let html = headerHtml(false) + `
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="search" id="jitenInput" placeholder="品目名で検索(例: でんち)"
+        value="${esc(jitenQuery)}" autocomplete="off">
+    </div>
+    <div class="cat-chips">` +
+    JITEN_FILTERS.map(([label, cat]) =>
+      `<button data-cat="${esc(cat)}" class="${jitenCat === cat ? "on" : ""}">${esc(label)}</button>`
+    ).join("") +
+    `</div>
+    <div id="jitenList">${jitenListHtml()}</div>` +
+    footerHtml();
+
+  app.innerHTML = html;
+  bindHeader();
+
+  const input = document.getElementById("jitenInput");
+  input.oninput = () => {
+    jitenQuery = input.value;
+    document.getElementById("jitenList").innerHTML = jitenListHtml();
+  };
+  app.querySelectorAll(".cat-chips button").forEach(b =>
+    b.onclick = () => {
+      jitenCat = b.dataset.cat;
+      app.querySelectorAll(".cat-chips button").forEach(x =>
+        x.classList.toggle("on", x.dataset.cat === jitenCat));
+      document.getElementById("jitenList").innerHTML = jitenListHtml();
+    });
+}
+
+/* =====================================================================
+ * 便利帳タブ (分け方・出し方ポスター)
+ * ===================================================================== */
+function renderBenri() {
+  let html = headerHtml(false) +
+    `<div class="page-title">便利帳【資源・ごみの分け方・出し方】</div>` +
+    APP_DATA.benri.map((b, i) => `
+      <details class="acc" data-benri="${i}">
+        <summary>${esc(b.title)}</summary>
+        <div class="acc-body">
+          <img class="benri-img" alt="${esc(b.title)}">
+          ${b.links.length ? `<div class="benri-links">【備考】<br>` +
+            b.links.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`).join("<br>") +
+            `</div>` : ""}
+        </div>
+      </details>`).join("") +
+    footerHtml();
+
+  app.innerHTML = html;
+  bindHeader();
+
+  // 画像(data URI 計約2MB)は開いた時に初めて src を与えてデコード負荷を遅延
+  app.querySelectorAll("details[data-benri]").forEach(d =>
+    d.addEventListener("toggle", () => {
+      if (d.open) {
+        const img = d.querySelector("img");
+        if (!img.src) img.src = APP_DATA.benri[Number(d.dataset.benri)].img;
+      }
+    }));
+}
+
+/* =====================================================================
+ * メニュータブ (お知らせ / 粗大ごみ / 家電等 / 食べきり / 問い合わせ / FAQ)
+ * ===================================================================== */
+const MENU_ITEMS = [
+  ["news", "区からのお知らせ", "取得時点のスナップショット"],
+  ["sodai", "粗大ごみの申し込み", "電話・インターネット受付"],
+  ["kaden", "家電・パソコン・小型充電式電池・注射針の処分", ""],
+  ["tabekiri", "食べきり協力店", "食品ロス削減に取り組む店舗"],
+  ["contact", "お問い合わせ先", "不法投棄・動物死体など"],
+  ["faq", "よくある質問", ""],
+];
+
+function renderMenu() {
+  if (menuPage) { renderMenuPage(menuPage); return; }
+  const html = headerHtml(false) +
+    `<div class="menu-list">` +
+    MENU_ITEMS.map(([key, label, note]) =>
+      `<button data-page="${key}"><span>${esc(label)}${
+        note ? `<span class="menu-note">${esc(note)}</span>` : ""
+      }</span></button>`).join("") +
+    `</div>` + footerHtml();
+  app.innerHTML = html;
+  bindHeader();
+  app.querySelectorAll("[data-page]").forEach(b =>
+    b.onclick = () => { menuPage = b.dataset.page; render(); });
+}
+
+function backLinkHtml() {
+  return `<button class="back-link" id="menuBack">‹ メニューに戻る</button>`;
+}
+function bindBack() {
+  document.getElementById("menuBack").onclick = () => { menuPage = null; render(); };
+}
+
+function snapshotNoteHtml(officialLabel) {
+  return `<div class="snapshot-note">※ ${esc(APP_DATA.fetchedAt)} 時点の公式アプリの内容です。
+    最新の${esc(officialLabel)}は
+    <a href="https://manage.delight-system.com/threeR/web/init/toshimaku?lang=ja" target="_blank" rel="noopener">公式Web版</a>
+    または<a href="https://www.city.toshima.lg.jp/kurashi/gomi/index.html" target="_blank" rel="noopener">区公式サイト</a>で確認してください。</div>`;
+}
+
+function contactEntriesHtml(entries) {
+  return entries.map(e => `<div class="card">
+    ${e.title ? `<div class="contact-title">${esc(e.title)}</div>` : ""}
+    ${e.org ? `<div class="contact-org">${esc(e.org)}</div>` : ""}
+    ${e.fields.map(f =>
+      `<div class="detail-label">${esc(f.label)}</div><div class="rich">${f.html}</div>`
+    ).join("")}
+  </div>`).join("");
+}
+
+function renderMenuPage(page) {
+  let html = headerHtml(false) + backLinkHtml();
+
+  if (page === "news") {
+    html += `<div class="page-title">区からのお知らせ</div>` +
+      snapshotNoteHtml("お知らせ") +
+      APP_DATA.news.map(n => `<details class="acc">
+        <summary><span class="jiten-name">
+          <span class="news-date">${esc(n.date)}</span>${n.new ? `<span class="news-new">NEW</span>` : ""}<br>${esc(n.title)}
+        </span></summary>
+        <div class="acc-body rich">${n.html}</div>
+      </details>`).join("");
+  } else if (page === "faq") {
+    html += `<div class="page-title">よくある質問</div>`;
+    let lastCat = null;
+    for (const f of APP_DATA.faq) {
+      if (f.cat !== lastCat) {
+        lastCat = f.cat;
+        html += `<div class="section-title">${esc(f.cat)}</div>`;
+      }
+      html += `<details class="acc">
+        <summary><span class="jiten-name">${esc(f.q)}</span></summary>
+        <div class="acc-body rich">${f.a}</div>
+      </details>`;
+    }
+  } else {
+    const data = APP_DATA.contacts[page];
+    html += `<div class="page-title">${esc(data.title)}</div>`;
+    for (const sec of data.sections) {
+      if (sec.label) html += `<div class="section-title">${esc(sec.label)}</div>`;
+      html += contactEntriesHtml(sec.entries);
+    }
+    if (page === "sodai") {
+      html += `<div class="snapshot-note">インターネット申込は
+        <a href="https://ecolife.e-tumo.jp/toshima-sodai-u/" target="_blank" rel="noopener">粗大ごみ受付センター(外部サイト)</a>
+        から。</div>`;
+    }
+  }
+
+  html += footerHtml();
+  app.innerHTML = html;
+  bindHeader();
+  bindBack();
+}
+
+/* ---------- 起動 ---------- */
+(function init() {
+  applyTheme();
+  // 「自動」設定のままOS側のモードが変わったときに追従する
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (currentTheme() === "auto") applyTheme();
+  });
+  const t = today0();
+  calYear = t.getFullYear();
+  calMonth = t.getMonth();
+  render();
+})();
+</script>
+</body>
+</html>
