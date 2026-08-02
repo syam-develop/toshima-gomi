@@ -493,7 +493,9 @@
  * file:// で開いても動くよう fetch は使わず埋め込みにしている。
  * 元の toshima-gomi.json を更新したら、この定数も同期させること。
  * ===================================================================== */
-const DATA = /* __GOMI_DATA__ */ null;
+// 収集曜日データは埋め込みをやめ、起動時に同ディレクトリの toshima-gomi.json を
+// fetch で読み込む (データ更新時は JSON を差し替えるだけで build.py 不要)。
+let DATA = null;
 
 /* =====================================================================
  * 公式Webアプリ相当のコンテンツ (2026-08-02 取得スナップショット)
@@ -720,6 +722,7 @@ document.querySelectorAll("#tabbar button").forEach(b =>
   });
 
 function render() {
+  if (!DATA) return; // toshima-gomi.json 読み込み完了前は何もしない
   updateTabbar();
   window.scrollTo(0, 0);
   app.classList.remove("full");
@@ -1181,12 +1184,30 @@ function renderMenuPage(page) {
 }
 
 /* ---------- 起動 ---------- */
-(function init() {
+(async function init() {
   applyTheme();
   // 「自動」設定のままOS側のモードが変わったときに追従する
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (currentTheme() === "auto") applyTheme();
   });
+  try {
+    // no-cache: CDNキャッシュの古いデータを掴まないよう毎回サーバに再検証させる
+    const res = await fetch("toshima-gomi.json", { cache: "no-cache" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    DATA = await res.json();
+  } catch (e) {
+    // file:// で直接開いた場合など。fetch はローカルファイル直開きでは動かない
+    app.innerHTML = `<div class="card" style="margin-top:24px">
+      <b>収集データ (toshima-gomi.json) を読み込めませんでした。</b>
+      <div style="margin-top:8px;font-size:13px;color:var(--sub)">
+        ローカルで確認する場合は、このフォルダで
+        <code>python3 -m http.server 8000</code> を実行して
+        <code>http://localhost:8000</code> を開いてください
+        (ブラウザで index.html を直接開くと fetch が制限されます)。<br>
+        エラー: ${esc(e.message)}
+      </div></div>`;
+    return;
+  }
   const t = today0();
   calYear = t.getFullYear();
   calMonth = t.getMonth();

@@ -4,9 +4,12 @@
   python3 build.py
 
 index.template.html のプレースホルダに以下を注入する:
-  - toshima-gomi.json : 収集曜日データ(区の収集曜日一覧PDF由来)
   - app-data.json     : 公式ごみ分別アプリWeb版のスナップショット
                         (分別辞典774品目 / FAQ / 連絡先 / お知らせ / 便利帳画像)
+
+収集曜日データ (toshima-gomi.json) は埋め込まず、ページ起動時に fetch で
+読み込む。データ更新時は toshima-gomi.json を差し替えるだけでよく、
+このスクリプトの再実行は template や app-data.json を変えたときだけ必要。
 
 app-data.json を作り直したい場合は、公式Web版
 https://manage.delight-system.com/threeR/web/init/toshimaku
@@ -20,12 +23,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def main():
-    gomi = json.load(open(os.path.join(HERE, 'toshima-gomi.json'), encoding='utf-8'))
     master = json.load(open(os.path.join(HERE, 'app-data.json'), encoding='utf-8'))
     html = open(os.path.join(HERE, 'index.template.html'), encoding='utf-8').read()
 
     for placeholder, obj in [
-        ('const DATA = /* __GOMI_DATA__ */ null;', gomi),
         ('const APP_DATA = /* __MASTER__ */ null;', master),
     ]:
         assert placeholder in html, f'placeholder not found: {placeholder}'

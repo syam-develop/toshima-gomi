@@ -1,6 +1,6 @@
 {
   "meta": {
-    "source": "豊島区「資源回収・ごみ収集曜日一覧（50音順）」令和8年4月発行",
+    "source": "豊島区「資源回収・ごみ収集曜日一覧（50音順）」令和8年4月発行（6月一部改訂）",
     "sourceUrl": "https://www.city.toshima.lg.jp/documents/1053/20260403165803.pdf",
     "extractedAt": "2026-08-02",
     "disclaimer": "非公式データ。PDFからの手動読み取りのため誤りの可能性あり。公開前に全件を原本と照合すること。最新情報は豊島区公式サイトを参照。",
@@ -35,9 +35,9 @@
       "id": "ikebukuro-2-a",
       "town": "池袋",
       "chome": [2],
-      "label": "池袋2丁目（14番5号・8号、15番2号〜3号、16番、17番、19番(要町通り沿い以外)、20番〜32番、39番〜40番(トキワ通り沿い以外)、44番〜45番(トキワ通り沿い以外)、46番、47番〜78番）",
+      "label": "池袋2丁目（14番5号・8号、15番2号〜3号、16番、17番、19番(要町通り沿い以外)、20番〜38番、39番〜40番(トキワ通り沿い以外)、42番、44番〜45番(トキワ通り沿い以外)、46番、47番〜78番）",
       "zone": "normal",
-      "banchiCondition": "14番5号・8号 / 15番2〜3号 / 16番 / 17番 / 19番(要町通り沿い以外) / 20〜32番 / 39〜40番(トキワ通り沿い以外) / 44〜45番(トキワ通り沿い以外) / 46番 / 47〜78番",
+      "banchiCondition": "14番5号・8号 / 15番2〜3号 / 16番 / 17番 / 19番(要町通り沿い以外) / 20〜38番 / 39〜40番(トキワ通り沿い以外) / 42番 / 44〜45番(トキワ通り沿い以外) / 46番 / 47〜78番",
       "bottleCanPet": ["tue"],
       "paperPlastic": ["wed"],
       "burnable": ["mon", "thu"],
@@ -341,7 +341,7 @@
       "bottleCanPet": ["tue"],
       "paperPlastic": ["wed"],
       "burnable": ["mon", "thu"],
-      "metalCeramicGlass": { "weekday": "fri", "nth": [1, 3] }
+      "metalCeramicGlass": { "weekday": "fri", "nth": [2, 4] }
     },
     {
       "id": "nishiikebukuro-3-a",
@@ -389,7 +389,7 @@
       "bottleCanPet": ["fri"],
       "paperPlastic": ["sat"],
       "burnable": ["mon", "thu"],
-      "metalCeramicGlass": { "weekday": "wed", "nth": [1, 3] }
+      "metalCeramicGlass": { "weekday": "tue", "nth": [1, 3] }
     },
     {
       "id": "higashiikebukuro-3-a",
@@ -521,7 +521,7 @@
       "bottleCanPet": ["mon"],
       "paperPlastic": ["tue"],
       "burnable": ["wed", "sat"],
-      "metalCeramicGlass": { "weekday": "thu", "nth": [2, 4] }
+      "metalCeramicGlass": { "weekday": "thu", "nth": [1, 3] }
     },
     {
       "id": "mejiro-1-5",
