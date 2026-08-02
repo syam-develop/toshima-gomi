@@ -758,7 +758,7 @@ function renderSetup(step, sel) {
     )].sort((x, y) => x - y);
     html += `<button class="back-link" data-back="town">‹ 町名を選び直す</button>
       <div class="card">
-      <div class="step-title">${esc(sel.town)} — 丁目を選んでください</div>
+      <div class="step-title">${esc(sel.town)}の丁目を選んでください</div>
       <div class="opt-grid">` +
       chomes.map(c => `<button data-chome="${c}">${c}丁目</button>`).join("") +
       `</div></div>`;
@@ -767,7 +767,7 @@ function renderSetup(step, sel) {
       a.town === sel.town && a.chome.includes(sel.chome));
     html += `<button class="back-link" data-back="chome">‹ 丁目を選び直す</button>
       <div class="card">
-      <div class="step-title">${esc(sel.town)}${sel.chome}丁目 — 番地を選んでください</div>
+      <div class="step-title">${esc(sel.town)}${sel.chome}丁目の番地を選んでください</div>
       <div class="opt-list">` +
       cands.map(a => {
         const cond = a.banchiCondition || "全域";
