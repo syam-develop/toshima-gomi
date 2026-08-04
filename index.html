@@ -122,7 +122,9 @@
   }
   .chip svg { width: 15px; height: 15px; flex: none; }
   .deadline { margin-top: 10px; font-size: 14px; font-weight: 600; }
-  .deadline .warn { color: var(--c-burnable); font-weight: 700; }
+
+  /* ── 次の収集カード ── */
+  .next-main { font-size: 26px; font-weight: 800; line-height: 1.3; }
 
   /* ── 表示切替(2週間/月間) ── */
   .seg {
@@ -365,6 +367,7 @@
     .card { padding: 24px; border-radius: 20px; }
     .banner-label { font-size: 14px; }
     .banner-main { font-size: 30px; }
+    .next-main { font-size: 34px; }
     .chip { font-size: 16px; padding: 8px 16px; }
     .chip svg { width: 19px; height: 19px; }
     .deadline { font-size: 17px; }
@@ -416,7 +419,7 @@
     }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body { background: #fff; padding: 0; }
-    #tabbar, header.app, .seg, .today-banner, footer,
+    #tabbar, header.app, .seg, .today-banner, .next-card, footer,
     .cal-head .tools, .cal-head .nav button { display: none !important; }
     .wrap { max-width: none; padding: 0; }
     .card { border: none; box-shadow: none; margin: 0; padding: 0; }
@@ -660,6 +663,28 @@ function isPastDeadline(area) {
   return now.getHours() * 60 + now.getMinutes() >= h * 60 + m;
 }
 
+/** 「次に出せる」収集日。今日が収集日でも締切時刻を過ぎていれば翌日以降を探す
+ *  (iOS版 nextCollection と同じ挙動)。 */
+function nextCollection(area) {
+  const today = today0();
+  for (let i = 0; i < 60; i++) {
+    const d = addDays(today, i);
+    const items = collectionsOn(area, d);
+    if (!items.length) continue;
+    if (i === 0 && isPastDeadline(area)) continue;
+    return { date: d, items };
+  }
+  return null;
+}
+
+/** "明日 8月6日(水)" のような相対表現つき日付 */
+function fmtRelative(date) {
+  const today = today0();
+  if (sameDay(date, today)) return `今日 ${fmtDate(date)}`;
+  if (sameDay(date, addDays(today, 1))) return `明日 ${fmtDate(date)}`;
+  return fmtDate(date);
+}
+
 /* ---------- 状態 ---------- */
 function loadArea() {
   const id = localStorage.getItem(STORAGE_KEY);
@@ -830,17 +855,25 @@ function renderCalView() {
   let html = headerHtml(true) +
     `<div class="area-name">📍 ${esc(area.label)}</div>`;
 
-  /* 今日の収集バナー */
-  if (todayItems.length) {
-    const past = isPastDeadline(area);
+  /* 今日の収集バナー / 次の収集カード (排他表示):
+     締切前の収集日はバナーのみ、それ以外は次の収集カードのみ */
+  if (todayItems.length && !isPastDeadline(area)) {
     html += `<div class="card today-banner">
       <div class="banner-label">今日 ${fmtDate(today)}</div>
       <div class="banner-main">今日は ${todayItems.map(k => esc(CATEGORIES[k].name)).join("・")} の日</div>
       <div class="banner-items">${chipsHtml(todayItems, "chip")}</div>
-      <div class="deadline">朝 ${deadlineOf(area)} までに出してください
-        ${past ? `<div class="warn">※締切時刻を過ぎています</div>` : ""}
-      </div>
+      <div class="deadline">朝 ${deadlineOf(area)} までに出してください</div>
     </div>`;
+  } else {
+    const next = nextCollection(area);
+    if (next) {
+      html += `<div class="card next-card">
+        <div class="banner-label">次の収集は</div>
+        <div class="next-main">${fmtRelative(next.date)}</div>
+        <div class="banner-items">${chipsHtml(next.items, "chip")}</div>
+        <div class="deadline">朝 ${deadlineOf(area)} まで</div>
+      </div>`;
+    }
   }
 
   /* 表示切替タブ */
