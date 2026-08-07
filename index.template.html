@@ -566,9 +566,7 @@ const JITEN_FILTERS = [
 ];
 
 const STORAGE_KEY = "toshimaGomi.areaId";
-const VIEW_KEY = "toshimaGomi.view";   // "twoweeks" | "month"
 const THEME_KEY = "toshimaGomi.theme"; // "auto" | "light" | "dark"
-const TAB_KEY = "toshimaGomi.tab";     // "cal" | "jiten" | "benri" | "menu"
 
 /* ---------- テーマ ---------- */
 const THEME_LABELS = { auto: "🌓 自動", light: "☀️ ライト", dark: "🌙 ダーク" };
@@ -692,8 +690,9 @@ function loadArea() {
 }
 const app = document.getElementById("app");
 let calYear, calMonth; // 表示中のカレンダー年月
-let tab = localStorage.getItem(TAB_KEY);
-if (!["cal", "jiten", "benri", "menu"].includes(tab)) tab = "cal";
+// タブと表示形式は永続化しない(起動時は常にカレンダーの月間表示から始める)
+let tab = "cal";
+let calViewMode = "month";  // "twoweeks" | "month"
 let menuPage = null;   // メニュータブ内のサブページ
 let jitenQuery = "";
 let jitenCat = "";
@@ -742,7 +741,6 @@ function updateTabbar() {
 document.querySelectorAll("#tabbar button").forEach(b =>
   b.onclick = () => {
     tab = b.dataset.tab;
-    localStorage.setItem(TAB_KEY, tab);
     menuPage = null;
     render();
   });
@@ -848,7 +846,7 @@ function renderCalView() {
   const area = loadArea();
   const today = today0();
   const todayItems = collectionsOn(area, today);
-  const view = localStorage.getItem(VIEW_KEY) || "twoweeks";
+  const view = calViewMode;
   // 月間表示のときだけコンテナ幅の上限を外して画面いっぱいに使う
   app.classList.toggle("full", view === "month");
 
@@ -910,7 +908,7 @@ function renderCalView() {
 
   app.querySelectorAll(".seg [data-view]").forEach(b =>
     b.onclick = () => {
-      localStorage.setItem(VIEW_KEY, b.dataset.view);
+      calViewMode = b.dataset.view;
       renderCalView();
     });
   if (view === "month") {
