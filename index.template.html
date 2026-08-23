@@ -197,7 +197,8 @@
     border-top: 1px solid var(--line);
   }
   table.cal td .d { font-size: 14px; font-weight: 700; }
-  table.cal td.other .d { color: var(--line); }
+  /* 前後の月の日: 日付・収集予定とも表示するが、半透明にして参考扱いとわかるように */
+  table.cal td.other { opacity: .4; }
   table.cal td.today {
     background: var(--today-bg); border-radius: 10px;
     box-shadow: inset 0 0 0 1.5px var(--today-line);
@@ -213,12 +214,18 @@
     font-size: 9px; font-weight: 800; line-height: 1.25;
     word-break: break-all;
   }
-  /* 画面に収まらないときに fitCalendar() が付ける縮小モード */
-  table.cal.cal-dense td { height: 40px; }
-  table.cal.cal-dense td .d { font-size: 12px; }
-  table.cal.cal-dense .cal-item { padding: 2px 1px 3px; margin-top: 2px; gap: 1px; border-radius: 6px; }
-  table.cal.cal-dense .cal-item svg { width: 12px; height: 12px; }
-  table.cal.cal-dense .cal-item .cl { font-size: 8px; }
+  /* 画面に収まらないときに fitCalendar() が付ける縮小モード。
+     画面フィット専用の仕組みなので、印刷には影響させない(詳細度が高く
+     印刷用の寸法指定を上書きしてしまうため @media screen に閉じ込める) */
+  @media screen {
+    table.cal.cal-dense td { height: 40px; }
+    table.cal.cal-dense td .d { font-size: 12px; }
+    table.cal.cal-dense .cal-item { padding: 2px 1px 3px; margin-top: 2px; gap: 1px; border-radius: 6px; }
+    table.cal.cal-dense .cal-item svg { width: 12px; height: 12px; }
+    table.cal.cal-dense .cal-item .cl { font-size: 8px; }
+    /* 高さが足りないときは前後の月の収集バッジ(参考情報)を省略して日付のみに */
+    table.cal.cal-dense td.other .cal-item { display: none; }
+  }
 
   /* ── 地域選択 ── */
   .setup .step-title { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
@@ -456,12 +463,18 @@
   }
   /* 印刷設定で選んだ用紙の向きに追従して、どちらでも1枚いっぱいに広げる。
      印刷時のメディアクエリは「用紙」の縦横で評価される。
-     (A4・余白10mm想定: 縦=277mm、横=190mm からヘッダー分を引いた高さ) */
+     (A4・余白10mm想定: 縦=277mm、横=190mm からヘッダー分を引いた高さ)
+     テーブルの余り高さは内容の多い行ほど多く配分されてしまい、収集のない
+     週がぺしゃんこになるため、各セルにも「(テーブル高さ − 曜日行) ÷ 週数」
+     の均等な高さを指定して全行を同じ高さに揃える。週数(4〜6)は
+     calendarHtml() がテーブルの style="--weeks:n" で渡してくる。 */
   @media print and (orientation: portrait) {
     table.cal { height: 252mm !important; }
+    table.cal td { height: calc(242mm / var(--weeks, 5)); }
   }
   @media print and (orientation: landscape) {
     table.cal { height: 166mm !important; }
+    table.cal td { height: calc(156mm / var(--weeks, 5)); }
   }
 </style>
 </head>
@@ -953,14 +966,15 @@ function fitCalendar() {
 }
 window.addEventListener("resize", fitCalendar);
 
-/** 1日ぶんのセルHTML。day が null なら月の範囲外の空セル。 */
-function calCellHtml(area, year, month, day, today) {
-  if (!day) return `<td class="other"></td>`;
-  const d = new Date(year, month, day);
+/** 1日ぶんのセルHTML。表示中の月以外の日(前後の月のはみ出し分)は
+ *  other クラスを付けて薄く表示する。収集予定も同様に表示する。 */
+function calCellHtml(area, month, d, today) {
+  const cls = [];
+  if (d.getMonth() !== month) cls.push("other");
+  if (sameDay(d, today)) cls.push("today");
   const items = collectionsOn(area, d);
-  const isToday = sameDay(d, today);
-  return `<td class="${isToday ? "today" : ""}">
-    <div class="d">${day}</div>` +
+  return `<td class="${cls.join(" ")}">
+    <div class="d">${d.getDate()}</div>` +
     items.map(k =>
       `<span class="cal-item ${k}">${ICONS[k]}<span class="cl">${esc(CATEGORIES[k].name)}</span></span>`
     ).join("") +
@@ -968,18 +982,16 @@ function calCellHtml(area, year, month, day, today) {
 }
 
 function calendarHtml(area, year, month, today) {
+  const first = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // 月を週ごとの配列に分解(日曜始まり・空きは null)
+  // 月初を含む週の日曜〜月末を含む週の土曜まで、前後の月の日も含めて
+  // 週ごとの Date 配列に展開する(空セルは作らない)
+  const start = addDays(first, -first.getDay());
+  const totalDays = Math.ceil((first.getDay() + daysInMonth) / 7) * 7;
   const weeks = [];
-  let week = new Array(7).fill(null);
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dow = new Date(year, month, day).getDay();
-    week[dow] = day;
-    if (dow === 6 || day === daysInMonth) {
-      weeks.push(week);
-      week = new Array(7).fill(null);
-    }
+  for (let i = 0; i < totalDays; i += 7) {
+    weeks.push(Array.from({ length: 7 }, (_, j) => addDays(start, i + j)));
   }
 
   let html = `<div class="cal-head">
@@ -994,12 +1006,13 @@ function calendarHtml(area, year, month, today) {
     </div>
   </div>`;
 
-  html += `<table class="cal"><thead><tr>` +
+  // --weeks: 印刷CSSが行高を均等割りするための週数(月により4〜6)
+  html += `<table class="cal" style="--weeks:${weeks.length}"><thead><tr>` +
     WEEKDAY_JP.map((w, i) =>
       `<th class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</th>`).join("") +
     `</tr></thead><tbody>` +
     weeks.map(w =>
-      `<tr>${w.map(day => calCellHtml(area, year, month, day, today)).join("")}</tr>`
+      `<tr>${w.map(d => calCellHtml(area, month, d, today)).join("")}</tr>`
     ).join("") +
     `</tbody></table>`;
   return html;
