@@ -227,6 +227,35 @@
     table.cal.cal-dense td.other .cal-item { display: none; }
   }
 
+  /* ── 範囲印刷 ── */
+  /* 印刷ボタンから開く「いつまで印刷するか」の選択ダイアログ */
+  #printDialog {
+    border: 1px solid var(--line); border-radius: 16px;
+    background: var(--card); color: var(--text);
+    padding: 20px; width: min(340px, calc(100vw - 48px));
+    font-family: inherit;
+    /* 全称セレクタの margin:0 リセットが UA の中央寄せ(margin:auto)を
+       打ち消してしまうため明示的に戻す */
+    margin: auto;
+  }
+  #printDialog::backdrop { background: rgba(0, 0, 0, .45); }
+  .dlg-title { font-size: 16px; font-weight: 800; margin-bottom: 14px; }
+  .dlg-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 14px; font-weight: 600;
+  }
+  #printUntil {
+    font-size: 14px; font-weight: 600; font-family: inherit;
+    padding: 8px 10px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+  }
+  .dlg-note { font-size: 12px; color: var(--sub); margin-top: 10px; }
+  .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  /* 文字色は --card(ライト=白/ダーク=濃色)でどちらのテーマでも accent 地に映える */
+  .dlg-actions .primary { background: var(--accent); border-color: var(--accent); color: var(--card); }
+  /* 印刷専用コンテナは画面には出さない */
+  #printRange { display: none; }
+
   /* ── 地域選択 ── */
   .setup .step-title { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
   .opt-grid { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -412,6 +441,9 @@
 
   /* ── 印刷: カレンダー(または表示中のリスト)だけを紙に出す ──
      ダークモード中でも紙は白なので、印刷時はライト配色を強制する */
+  /* 印刷CSSの寸法計算は「余白10mm」を前提にしているため、ここで固定する
+     (ブラウザ既定の余白は環境によりまちまちで、広いと表が次ページに割れる) */
+  @page { margin: 10mm; }
   @media print {
     :root, :root[data-theme="dark"] {
       --bg: #fff; --card: #fff; --text: #1a1a1a; --sub: #555; --line: #bbb;
@@ -460,6 +492,13 @@
       color: inherit; font-weight: 700;
     }
     .sched-row.is-today { background: none; }
+
+    /* 範囲印刷(印刷ボタンで月数を指定した場合): 画面の内容の代わりに
+       #printRange に生成した各月のカレンダーを1か月1枚で印刷する */
+    body.print-multi #app { display: none !important; }
+    body.print-multi #printRange { display: block; }
+    .print-page { page-break-after: always; }
+    .print-page:last-child { page-break-after: auto; }
   }
   /* 印刷設定で選んだ用紙の向きに追従して、どちらでも1枚いっぱいに広げる。
      印刷時のメディアクエリは「用紙」の縦横で評価される。
@@ -499,6 +538,23 @@
     メニュー
   </button>
 </div></nav>
+
+<!-- 範囲印刷: 印刷ボタンから開く「いつまで印刷するか」の選択ダイアログ -->
+<dialog id="printDialog">
+  <div class="dlg-title">カレンダーの印刷</div>
+  <div class="dlg-row">
+    <span id="printFrom"></span> から
+    <select id="printUntil"></select> まで
+  </div>
+  <div class="dlg-note">1か月ごとに1枚ずつ印刷されます</div>
+  <div class="dlg-actions">
+    <button type="button" class="tbtn" id="printCancel">キャンセル</button>
+    <button type="button" class="tbtn primary" id="printGo">🖨 印刷する</button>
+  </div>
+</dialog>
+
+<!-- 範囲印刷時だけ使う印刷専用コンテナ(printMonths() が各月を生成する) -->
+<div id="printRange"></div>
 
 <script>
 "use strict";
@@ -939,7 +995,7 @@ function renderCalView() {
       calMonth = t.getMonth();
       renderCalView();
     };
-    document.getElementById("calPrint").onclick = () => window.print();
+    document.getElementById("calPrint").onclick = openPrintDialog;
     fitCalendar();
   }
 }
@@ -981,7 +1037,9 @@ function calCellHtml(area, month, d, today) {
   `</td>`;
 }
 
-function calendarHtml(area, year, month, today) {
+/** 指定月のカレンダーテーブル(<table class="cal">)だけを返す。
+ *  画面表示(calendarHtml)と範囲印刷(printMonths)の両方から使う。 */
+function calTableHtml(area, year, month, today) {
   const first = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
@@ -994,7 +1052,19 @@ function calendarHtml(area, year, month, today) {
     weeks.push(Array.from({ length: 7 }, (_, j) => addDays(start, i + j)));
   }
 
-  let html = `<div class="cal-head">
+  // --weeks: 印刷CSSが行高を均等割りするための週数(月により4〜6)
+  return `<table class="cal" style="--weeks:${weeks.length}"><thead><tr>` +
+    WEEKDAY_JP.map((w, i) =>
+      `<th class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</th>`).join("") +
+    `</tr></thead><tbody>` +
+    weeks.map(w =>
+      `<tr>${w.map(d => calCellHtml(area, month, d, today)).join("")}</tr>`
+    ).join("") +
+    `</tbody></table>`;
+}
+
+function calendarHtml(area, year, month, today) {
+  return `<div class="cal-head">
     <div class="nav">
       <button id="calPrev" aria-label="前の月">‹</button>
       <span class="title">${year}年${month + 1}月</span>
@@ -1004,19 +1074,60 @@ function calendarHtml(area, year, month, today) {
       <button class="tbtn" id="calToday">今日へ</button>
       <button class="tbtn" id="calPrint">🖨 印刷</button>
     </div>
-  </div>`;
-
-  // --weeks: 印刷CSSが行高を均等割りするための週数(月により4〜6)
-  html += `<table class="cal" style="--weeks:${weeks.length}"><thead><tr>` +
-    WEEKDAY_JP.map((w, i) =>
-      `<th class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</th>`).join("") +
-    `</tr></thead><tbody>` +
-    weeks.map(w =>
-      `<tr>${w.map(d => calCellHtml(area, month, d, today)).join("")}</tr>`
-    ).join("") +
-    `</tbody></table>`;
-  return html;
+  </div>` + calTableHtml(area, year, month, today);
 }
+
+/* =====================================================================
+ * 範囲印刷: 表示中の月から指定月まで、1か月1枚でまとめて印刷する。
+ * 印刷ボタン → ダイアログで「いつまで」を選択 → #printRange に各月の
+ * カレンダーを生成し、body.print-multi を付けて画面の代わりに印刷する。
+ * Cmd+P などボタンを経由しない印刷は従来どおり表示中の月のみ。
+ * ===================================================================== */
+const printDialog = document.getElementById("printDialog");
+
+function openPrintDialog() {
+  // <dialog> 非対応の古いブラウザでは従来どおり表示中の月だけ印刷する
+  if (!printDialog.showModal) { window.print(); return; }
+  const sel = document.getElementById("printUntil");
+  sel.innerHTML = Array.from({ length: 12 }, (_, i) => {
+    const y = calYear + Math.floor((calMonth + i) / 12);
+    const m = (calMonth + i) % 12;
+    const note = i === 0 ? "この月のみ" : `${i + 1}か月分`;
+    return `<option value="${y}-${m}">${y}年${m + 1}月(${note})</option>`;
+  }).join("");
+  document.getElementById("printFrom").textContent = `${calYear}年${calMonth + 1}月`;
+  printDialog.showModal();
+}
+
+document.getElementById("printCancel").onclick = () => printDialog.close();
+document.getElementById("printGo").onclick = () => {
+  const [ey, em] = document.getElementById("printUntil").value.split("-").map(Number);
+  printDialog.close();
+  printMonths(calYear, calMonth, (ey - calYear) * 12 + (em - calMonth) + 1);
+};
+
+function printMonths(year, month, count) {
+  const area = loadArea();
+  const today = today0();
+  let html = "";
+  for (let i = 0; i < count; i++) {
+    const y = year + Math.floor((month + i) / 12);
+    const m = (month + i) % 12;
+    html += `<section class="print-page">
+      <div class="area-name">📍 ${esc(area.label)}</div>
+      <div class="cal-head"><span class="title">${y}年${m + 1}月</span></div>
+      ${calTableHtml(area, y, m, today)}
+    </section>`;
+  }
+  document.getElementById("printRange").innerHTML = html;
+  document.body.classList.add("print-multi");
+  window.print();
+}
+// 印刷が終わったら通常表示に戻す(生成した数か月分のDOMも破棄する)
+window.addEventListener("afterprint", () => {
+  document.body.classList.remove("print-multi");
+  document.getElementById("printRange").innerHTML = "";
+});
 
 /* =====================================================================
  * 分別辞典タブ (774品目・検索 + カテゴリ絞り込み)
