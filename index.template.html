@@ -362,8 +362,6 @@
   .section-title { font-size: 14px; font-weight: 800; color: var(--sub); margin: 16px 2px 8px; }
   .contact-title { font-size: 15px; font-weight: 800; }
   .contact-org { font-size: 13px; color: var(--sub); margin-top: 1px; }
-  .news-date { font-size: 12px; color: var(--sub); font-weight: 700; }
-  .news-new { color: var(--c-burnable); font-size: 11px; font-weight: 800; margin-left: 6px; }
   .snapshot-note {
     font-size: 12px; color: var(--sub); background: var(--seg-bg);
     border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; line-height: 1.6;
@@ -570,13 +568,15 @@
 let DATA = null;
 
 /* =====================================================================
- * 公式Webアプリ相当のコンテンツ (2026-08-02 取得スナップショット)
+ * 公式Webアプリ相当のコンテンツ (crawl.py で取得したスナップショット。
+ * 取得日は APP_DATA.fetchedAt)
  * 出典: 豊島区ごみ分別アプリWeb版 (manage.delight-system.com/threeR)
  *  - jiten:    分別辞典 774品目 {kana,name,cat,note,kw}
  *  - faq:      よくある質問 {cat,q,a(HTML)}
  *  - contacts: 粗大ごみ申込/家電等処分/食べきり協力店/お問い合わせ先
- *  - news:     区からのお知らせ(取得時点のスナップショット)
  *  - benri:    便利帳(分け方・出し方ポスター画像 data URI)
+ * 「区からのお知らせ」(台風・年末年始などの時事情報) は載せない。
+ * スナップショットでは古い告知が残り続けるため、公式サイトへの誘導に任せる。
  * ===================================================================== */
 const APP_DATA = /* __MASTER__ */ null;
 
@@ -1244,10 +1244,9 @@ function renderBenri() {
 }
 
 /* =====================================================================
- * メニュータブ (お知らせ / 粗大ごみ / 家電等 / 食べきり / 問い合わせ / FAQ)
+ * メニュータブ (粗大ごみ / 家電等 / 食べきり / 問い合わせ / FAQ)
  * ===================================================================== */
 const MENU_ITEMS = [
-  ["news", "区からのお知らせ", "取得時点のスナップショット"],
   ["sodai", "粗大ごみの申し込み", "電話・インターネット受付"],
   ["kaden", "家電・パソコン・小型充電式電池・注射針の処分", ""],
   ["tabekiri", "食べきり協力店", "食品ロス削減に取り組む店舗"],
@@ -1277,13 +1276,6 @@ function bindBack() {
   document.getElementById("menuBack").onclick = () => { menuPage = null; render(); };
 }
 
-function snapshotNoteHtml(officialLabel) {
-  return `<div class="snapshot-note">※ ${esc(APP_DATA.fetchedAt)} 時点の公式アプリの内容です。
-    最新の${esc(officialLabel)}は
-    <a href="https://manage.delight-system.com/threeR/web/init/toshimaku?lang=ja" target="_blank" rel="noopener">公式Web版</a>
-    または<a href="https://www.city.toshima.lg.jp/kurashi/gomi/index.html" target="_blank" rel="noopener">区公式サイト</a>で確認してください。</div>`;
-}
-
 function contactEntriesHtml(entries) {
   return entries.map(e => `<div class="card">
     ${e.title ? `<div class="contact-title">${esc(e.title)}</div>` : ""}
@@ -1297,16 +1289,7 @@ function contactEntriesHtml(entries) {
 function renderMenuPage(page) {
   let html = headerHtml(false) + backLinkHtml();
 
-  if (page === "news") {
-    html += `<div class="page-title">区からのお知らせ</div>` +
-      snapshotNoteHtml("お知らせ") +
-      APP_DATA.news.map(n => `<details class="acc">
-        <summary><span class="jiten-name">
-          <span class="news-date">${esc(n.date)}</span>${n.new ? `<span class="news-new">NEW</span>` : ""}<br>${esc(n.title)}
-        </span></summary>
-        <div class="acc-body rich">${n.html}</div>
-      </details>`).join("");
-  } else if (page === "faq") {
+  if (page === "faq") {
     html += `<div class="page-title">よくある質問</div>`;
     let lastCat = null;
     for (const f of APP_DATA.faq) {

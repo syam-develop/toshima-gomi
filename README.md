@@ -8,6 +8,7 @@ GitHub Pages で公開している単一ページの Web アプリ。
 |---|---|
 | `toshima-gomi.json` | **収集曜日データ**(区の収集曜日一覧PDF由来)。ページ起動時に fetch で読み込む |
 | `app-data.json` | 公式ごみ分別アプリWeb版のスナップショット(分別辞典774品目・FAQ・連絡先・便利帳画像) |
+| `crawl.py` | 公式Web版を再クロールして `app-data.json` を作り直す |
 | `index.template.html` | ページ本体のテンプレート(CSS/JS 含む) |
 | `build.py` | `index.template.html` + `app-data.json` → `index.html` を生成 |
 | `index.html` | **生成物。直接編集しないこと**(build.py で上書きされる) |
@@ -24,7 +25,26 @@ GitHub Pages で公開している単一ページの Web アプリ。
 
 2. commit & push するだけ。**build.py の再実行は不要**(実行時に fetch で読むため)
 
-### 分別辞典・連絡先など(app-data.json)やテンプレートを更新する場合
+### 分別辞典・連絡先など(app-data.json)を公式の最新に更新する場合
+
+```sh
+python3 crawl.py --dry-run   # 公式Web版を取得し、前回からの変更点を表示(書き込まない)
+python3 crawl.py             # 問題なければ app-data.json を上書き
+python3 build.py             # index.html を再生成
+```
+
+を実行してから commit & push する。続けて iOS版にも反映する
+(`../ToshimaGomiApp/README.md` の「公式データの更新手順」)。
+
+- 分別辞典の読み仮名 `yomi` は公式に無い自前データ。既存の値を品目名で引き継ぐので、
+  公式に品目が増えたときは警告に出た品目の `yomi` を `app-data.json` に手で書き足す
+- 公式側の分別区分の表記ゆれは `crawl.py` の `CATEGORY_ALIASES` で正式名に揃える。
+  未知の区分が現れたら止まるので、表記ゆれか新区分かを判断して対応する
+- **「区からのお知らせ」は取得しない。** 台風・年末年始などの時事情報は
+  スナップショットにすると古い告知が残り続けるため、載せない方針
+- 便利帳の画像は、公式側で更新されたものだけ縮小し直す(このときだけ Pillow が必要)
+
+### テンプレート(index.template.html)を変更した場合
 
 ```sh
 python3 build.py   # index.html を再生成

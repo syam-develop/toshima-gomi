@@ -5,15 +5,15 @@
 
 index.template.html のプレースホルダに以下を注入する:
   - app-data.json     : 公式ごみ分別アプリWeb版のスナップショット
-                        (分別辞典774品目 / FAQ / 連絡先 / お知らせ / 便利帳画像)
+                        (分別辞典774品目 / FAQ / 連絡先 / 便利帳画像)
 
 収集曜日データ (toshima-gomi.json) は埋め込まず、ページ起動時に fetch で
 読み込む。データ更新時は toshima-gomi.json を差し替えるだけでよく、
 このスクリプトの再実行は template や app-data.json を変えたときだけ必要。
 
-app-data.json を作り直したい場合は、公式Web版
+app-data.json を公式Web版
 https://manage.delight-system.com/threeR/web/init/toshimaku
-を再クロールして同じ構造のJSONを生成すること(構造はキー参照)。
+の最新内容で作り直すには crawl.py を使う。
 """
 import json
 import os
