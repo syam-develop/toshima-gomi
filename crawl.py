@@ -146,9 +146,32 @@ def text_of(fragment):
     return htmllib.unescape(re.sub(r"<[^>]+>", "", fragment)).strip()
 
 
+# HTMLのまま載せてよいタグ (html_of 参照)。改行と、電話・Webへのリンクだけ。
+SAFE_TAG_RE = re.compile(
+    r'<br\s*/?>'
+    r'|</a>'
+    r'|<a href="(?:https?://|tel:)[^"<>\s]*"(?: target="_blank")?>')
+
+
 def html_of(fragment):
-    """HTML断片をHTMLのまま保持する (<br/> や <a> を残す)。前後の空白だけ除去。"""
-    return fragment.strip()
+    """HTML断片をHTMLのまま保持する (<br/> や <a> を残す)。前後の空白だけ除去。
+
+    ここを通った値 (FAQの回答・連絡先の各欄) は、ページ側で innerHTML に
+    そのまま流し込まれる。つまり公式サイトの内容が、こちらの公開ページ上で
+    HTMLとして実行される。公式側が改ざんされたり想定外のタグを使い始めたり
+    しても持ち込まないよう、SAFE_TAG_RE に無いタグ (script・img・イベント属性・
+    javascript: のリンク等) が1つでもあれば中止する。書き換えて通すのではなく
+    止めるのは、何が来たのかを人が見て判断するため。
+    """
+    html = fragment.strip()
+    rest = SAFE_TAG_RE.sub("", html)
+    if "<" in rest:
+        at = rest.index("<")
+        raise CrawlError(
+            "許可していないHTMLが含まれています: "
+            f"{rest[max(0, at - 20):at + 60]!r}。安全なタグなら SAFE_TAG_RE に"
+            "追加し、そうでなければ公式サイトの内容を確認してください")
+    return html
 
 
 def jiten_text(fragment):
@@ -384,9 +407,12 @@ def crawl_benri(log, old_benri, old_fetched_at):
         else:
             img = shrink_image(base64.b64decode(res["image_data"]))
             state = "画像を更新"
-        benri.append({"title": title,
-                      "links": re.findall(r'<a href="([^"]+)"', body),
-                      "img": img})
+        # links はページ側で <a href> になる。javascript: 等を持ち込まない
+        links = re.findall(r'<a href="([^"]+)"', body)
+        for url in links:
+            if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+                raise CrawlError(f"便利帳「{title}」: http(s) 以外のリンクです: {url!r}")
+        benri.append({"title": title, "links": links, "img": img})
         log(f"  {title} (公式の最終更新 {edited}: {state})")
     if not benri:
         raise CrawlError("便利帳: 1件もパースできません")
