@@ -2,6 +2,11 @@
 
 GitHub Pages で公開している単一ページの Web アプリ。
 
+このフォルダは、iOS版と合わせて管理している本体リポジトリ(非公開)の `web/` にあたる。
+公開リポジトリ `toshima-gomi` はその内容を反映したもので、直接は編集しない。
+変更は本体リポジトリの `web/` で行い、`scripts/deploy-web.sh` で公開する
+(本体リポジトリの README「Web版の公開」)。以下の `../` は本体リポジトリの直下を指す。
+
 ## ファイル構成
 
 | ファイル | 役割 |
@@ -17,13 +22,13 @@ GitHub Pages で公開している単一ページの Web アプリ。
 
 ### 収集曜日データ(toshima-gomi.json)を更新する場合
 
-1. `toshima-gomi.json` を編集する(iOS版リポジトリ `../ToshimaGomiApp/Shared/toshima-gomi.json` がマスター。更新後にこちらへコピーする)
+1. マスターは `../Shared/toshima-gomi.json`(iOS版と共有)。そちらを更新してから、ここへコピーする
 
    ```sh
-   cp ../ToshimaGomiApp/Shared/toshima-gomi.json toshima-gomi.json
+   cp ../Shared/toshima-gomi.json toshima-gomi.json
    ```
 
-2. commit & push するだけ。**build.py の再実行は不要**(実行時に fetch で読むため)
+2. コミットして公開するだけ。**build.py の再実行は不要**(実行時に fetch で読むため)
 
 ### 分別辞典・連絡先など(app-data.json)を公式の最新に更新する場合
 
@@ -33,8 +38,8 @@ python3 crawl.py             # 問題なければ app-data.json を上書き
 python3 build.py             # index.html を再生成
 ```
 
-を実行してから commit & push する。続けて iOS版にも反映する
-(`../ToshimaGomiApp/README.md` の「公式データの更新手順」)。
+を実行し、続けて iOS版にも反映してから(`../README.md` の「公式データの更新手順」)、
+コミットして公開する。
 
 - 分別辞典の読み仮名 `yomi` は公式に無い自前データ。既存の値を品目名で引き継ぐので、
   公式に品目が増えたときは警告に出た品目の `yomi` を `app-data.json` に手で書き足す
@@ -50,7 +55,7 @@ python3 build.py             # index.html を再生成
 python3 build.py   # index.html を再生成
 ```
 
-を実行してから commit & push する。
+を実行してから、コミットして公開する。
 
 ## ローカルでの動作確認
 
@@ -64,4 +69,4 @@ python3 -m http.server 8000
 
 ## 関連
 
-- iOS版(SwiftUI + WidgetKit): `../ToshimaGomiApp`。データの出典・照合手順はそちらの README を参照。
+- iOS版(SwiftUI + WidgetKit)は本体リポジトリの直下にある。データの出典・照合手順は `../README.md` を参照。
