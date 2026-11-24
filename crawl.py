@@ -18,6 +18,8 @@
     selectArea → 地域の一覧 (町 → 丁目 → 番 → 号。末端の地域ごとに areaId が付く)
     calendar   → areas[] の収集曜日・zone (末端の地域ごとに収集日カレンダーを
                  1か月ぶん取り、「毎週◯曜」「第n◯曜」のルールに読み替える)
+               → closedDates 年末年始など、いつもの曜日なのに収集が無い日
+                 (代表のエリアのカレンダーを12か月先まで見て拾う)
 
 収集曜日について:
   エリアの区切り (id・町名・丁目・表示名・番地条件) は公式には無く、こちらで
@@ -26,7 +28,7 @@
   公式側で地域が増減・改名されたら、対応が取れなくなった地域を挙げて止まるので、
   officialAreas (必要ならエリアの区切り) を直してから再実行する。
 
-  公式の全地域 (約90) のカレンダーを1ページずつ取るため、4分ほどかかる
+  公式の全地域 (約90) のカレンダーを1ページずつ取るため、5分ほどかかる
   (1ページ約1.7MB。サーバに負荷をかけないよう1リクエストごとに待つ)。
 
 取得しないもの:
@@ -480,17 +482,22 @@ SCHEDULE_FIELDS = ["zone", "bottleCanPet", "paperPlastic", "burnable", "metalCer
 def pick_sample_month(today):
     """収集曜日の読み取りに使う公式カレンダーの (年, 月) を決める (--month 省略時)。
 
+    基本は今月。ただし12月と1月は、次に来る2月を使う。
+
     1か月ぶんの収集日から曜日のルールを逆算するので、その月が規則どおりに
     並んでいないと読み取れない (rules_from_calendar が中止する)。
     公式カレンダーで確かめたこと (2026-11 時点):
-      - 12月は31日、1月は1〜3日の収集が載っていない (年末年始の休み)。
-        その日が収集日にあたる地域で「毎週」「第1・3」が崩れるので読み取れない
+      - 年末年始は収集が載っていない (2026年12月31日と2027年1月1・2日。3日は
+        日曜)。その日が収集日にあたる地域で「毎週」「第1・3」が崩れるので、
+        12月と1月は読み取れない
       - 祝日には通常どおり収集が載っている (2026年11月・2027年4月で確認)
-      - 過去の月 (2026年4月) も、来年度の月 (2027年4月) も同じルールで返ってくる
-
-    TODO: いまは単純に「今月」を返している。12月・1月に実行すると読み取れずに
-    中止するので、そのときどの月を使うかをここで決める。
+      - 先の月も今と同じルールで返ってくる (2027年2月・4月で確認) ので、
+        2月を読んでも結果は変わらない
     """
+    if today.month == 12:
+        return today.year + 1, 2
+    if today.month == 1:
+        return today.year, 2
     return today.year, today.month
 
 
@@ -664,7 +671,8 @@ def rules_from_calendar(days, year, month, path):
 
 
 def crawl_schedule(log, old_areas, year, month):
-    """areas[] の収集曜日と zone (SCHEDULE_FIELDS) を公式の値で置き換えて返す。
+    """areas[] の収集曜日と zone (SCHEDULE_FIELDS) を公式の値で置き換える。
+    戻り値: (新しい areas, 公式の地域 {path: {"areaId", "note"}})
 
     エリアの区切りは old_areas のまま。各エリアの officialAreas に挙げた公式の
     地域をすべて読み、その中で値が割れたら (= 区切りが公式と合わなくなったら) 止める。
@@ -710,7 +718,109 @@ def crawl_schedule(log, old_areas, year, month):
         new_areas.append({**area, **read[first]})
         if count % 10 == 0 or count == len(old_areas):
             log(f"  {count}/{len(old_areas)}エリア")
-    return new_areas
+    return new_areas, official
+
+
+# ─────────────────────────────────────────────────────────────────
+# 収集の無い日 (toshima-gomi.json の closedDates)
+#
+# 曜日のルールだけでは、年末年始のように「いつもの曜日なのに収集が無い日」を
+# 表せない。公式カレンダーを先の月まで見て、そういう日を拾っておく。両アプリは
+# closedDates の日を、曜日のルールより優先して「収集なし」にする。
+# ─────────────────────────────────────────────────────────────────
+
+# 何か月先まで調べるか (今月を含めて13か月 = 次の年末年始は必ず入る)
+CLOSED_MONTHS_AHEAD = 12
+
+
+def expected_on(area, date):
+    """曜日のルールどおりなら、その日に集める品目 (両アプリの収集日計算と同じ)"""
+    weekday = WEEKDAYS[date.weekday()]
+    keys = {key for key in ("burnable", "bottleCanPet", "paperPlastic")
+            if weekday in area[key]}
+    metal = area["metalCeramicGlass"]
+    if metal["weekday"] == weekday and (date.day + 6) // 7 in metal["nth"]:
+        keys.add("metalCeramicGlass")
+    return keys
+
+
+def keys_on(kinds, where):
+    """公式カレンダーの1日ぶんの種別 → 品目の集合 (expected_on と比べられる形)"""
+    unknown = [kind for kind in kinds if kind not in CALENDAR_KINDS]
+    if unknown:
+        raise CrawlError(f"{where}: 未知の収集種別 {unknown}")
+    keys = {CALENDAR_KINDS[kind] for kind in kinds}
+    if ("paper" in keys) != ("plastic" in keys):
+        raise CrawlError(f"{where}: 紙とプラスチックの片方だけが載っています: {kinds}")
+    if "paper" in keys:
+        keys = keys - {"paper", "plastic"} | {"paperPlastic"}
+    return keys
+
+
+def pick_checker_areas(areas):
+    """収集の無い日を調べるのに使うエリアを選ぶ。
+
+    全エリアを13か月ぶん見ると1,200ページを超えるので、少数のエリアで代表させる。
+    月〜土のどの曜日にも「毎週の収集」が2エリア以上あるように選ぶので、休みの日は
+    必ず2エリア以上で確かめられる (日曜はもともと収集が無い)。似たエリアばかりに
+    ならないよう、毎週の曜日の組み合わせが同じエリアは1つしか使わない。
+    """
+    covered = dict.fromkeys(WEEKDAYS[:6], 0)
+    chosen, patterns = [], set()
+    for area in areas:
+        pattern = (tuple(area["bottleCanPet"]), tuple(area["paperPlastic"]),
+                   tuple(area["burnable"]))
+        weekly = {weekday for days in pattern for weekday in days}
+        if pattern in patterns or all(covered.get(w, 2) >= 2 for w in weekly):
+            continue
+        patterns.add(pattern)
+        chosen.append(area)
+        for weekday in weekly:
+            covered[weekday] = covered.get(weekday, 0) + 1
+        if all(count >= 2 for count in covered.values()):
+            return chosen
+    raise CrawlError(f"収集の無い日を調べるエリアを選べません (曜日ごとのエリア数: {covered})")
+
+
+def crawl_closed_dates(log, areas, official, today):
+    """今月から CLOSED_MONTHS_AHEAD か月先までの「収集の無い日」を返す (["2026-12-31", …])。
+
+    代表のエリアについて、公式カレンダーの毎日を曜日のルール (expected_on) と比べる。
+      - ルールどおり                 → 通常の日
+      - 集めるはずなのに何も無い     → 収集の無い日
+      - それ以外 (一部だけ無い、ルールに無い品目がある等) → 説明がつかないので止める
+    休みは区内共通という前提なので、あるエリアで休みの日が別のエリアで通常どおり
+    だったら、それも止める。
+    """
+    checkers = pick_checker_areas(areas)
+    first = today.year * 12 + today.month - 1
+    months = [(index // 12, index % 12 + 1)
+              for index in range(first, first + CLOSED_MONTHS_AHEAD + 1)]
+    log(f"  {months[0][0]}年{months[0][1]}月〜{months[-1][0]}年{months[-1][1]}月を "
+        f"{len(checkers)}エリア ({'、'.join(a['label'][:12] for a in checkers)}) で確認")
+    closed, normal = {}, {}  # 日付 → その判定になったエリアの表示名
+    for year, month in months:
+        for area in checkers:
+            path = area["officialAreas"][0]
+            page = fetch_calendar(official[path]["areaId"], year, month)
+            for day, kinds in parse_calendar(page, path, year, month).items():
+                date = datetime.date(year, month, day)
+                where = f"地域 {path} の {date.isoformat()}"
+                expected, actual = expected_on(area, date), keys_on(kinds, where)
+                if actual == expected:
+                    if expected:
+                        normal[date] = path
+                elif expected and not actual:
+                    closed[date] = path
+                else:
+                    raise CrawlError(
+                        f"{where}: 公式の収集 {sorted(actual)} が、曜日のルール "
+                        f"{sorted(expected)} でも「収集の無い日」でも説明できません")
+    for date in sorted(set(closed) & set(normal)):
+        raise CrawlError(
+            f"{date.isoformat()}: {closed[date]} では収集が無いのに、{normal[date]} では"
+            "通常どおりです。休みが区内共通でないなら、closedDates の持ち方から見直しが必要です")
+    return [date.isoformat() for date in sorted(closed)]
 
 
 def dump_schedule(data):
@@ -732,8 +842,9 @@ def dump_schedule(data):
                 text = one(value)
             rows.append(f"      {one(key)}: {text}")
         blocks.append("    {\n" + ",\n".join(rows) + "\n    }")
-    return ('{\n  "meta": ' + meta + ',\n  "areas": [\n'
-            + ",\n".join(blocks) + "\n  ]\n}\n")
+    return ('{\n  "meta": ' + meta
+            + ',\n  "closedDates": ' + one(data["closedDates"])
+            + ',\n  "areas": [\n' + ",\n".join(blocks) + "\n  ]\n}\n")
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -782,9 +893,13 @@ def diff_snapshot(old, new):
     return out
 
 
-def diff_schedule(old_areas, new_areas):
+def diff_schedule(old, new):
     out = []
-    diff_keyed("areas", old_areas, new_areas, lambda a: a["id"], SCHEDULE_FIELDS, out)
+    diff_keyed("areas", old["areas"], new["areas"], lambda a: a["id"], SCHEDULE_FIELDS, out)
+    # 過ぎた月の日付は調べる範囲から外れるので、古い日付の「削除」は毎回出る
+    before, after = set(old.get("closedDates", [])), set(new["closedDates"])
+    out += [f"closedDates[{date}]: 削除" for date in sorted(before - after)]
+    out += [f"closedDates[{date}]: 追加" for date in sorted(after - before)]
     return out
 
 
@@ -824,7 +939,8 @@ def main():
     except OSError as e:  # エリアの区切りは公式に無いので、これが無いと作れない
         print(f"中止: 収集曜日データ (エリアの区切り) を読めません: {e}", file=sys.stderr)
         return 1
-    year, month = args.month or pick_sample_month(datetime.date.today())
+    today = datetime.date.today()
+    year, month = args.month or pick_sample_month(today)
 
     try:
         log("分別辞典を取得中…")
@@ -840,7 +956,10 @@ def main():
         log("便利帳を取得中…")
         benri = crawl_benri(log, old.get("benri", []), old.get("fetchedAt"))
         log("収集曜日を取得中… (公式の全地域のカレンダーを取るので4分ほどかかります)")
-        areas = crawl_schedule(log, old_schedule["areas"], year, month)
+        areas, official = crawl_schedule(log, old_schedule["areas"], year, month)
+        log("収集の無い日 (年末年始など) を取得中…")
+        closed_dates = crawl_closed_dates(log, areas, official, today)
+        log(f"  {len(closed_dates)}日: {'、'.join(closed_dates) or 'なし'}")
     except CrawlError as e:
         print(f"\n中止: {e}", file=sys.stderr)
         return 1
@@ -850,15 +969,16 @@ def main():
 
     # 2つのファイルは同じ出典を同じときに取ったものなので、取得日を揃える
     # (アプリの出典表示は、この日付を1つだけ出す)
-    today = datetime.date.today().isoformat()
+    fetched_at = today.isoformat()
     new = {"jiten": jiten, "faq": faq, "contacts": contacts, "benri": benri,
-           "fetchedAt": today}
-    new_schedule = {"meta": {**old_schedule["meta"], "fetchedAt": today},
+           "fetchedAt": fetched_at}
+    new_schedule = {"meta": {**old_schedule["meta"], "fetchedAt": fetched_at},
+                    "closedDates": closed_dates,
                     "areas": areas}
 
     for name, raw, cat in aliased:
         log(f"\n表記ゆれを補正: {name} の区分「{raw}」→「{cat}」")
-    diffs = diff_snapshot(old, new) + diff_schedule(old_schedule["areas"], areas)
+    diffs = diff_snapshot(old, new) + diff_schedule(old_schedule, new_schedule)
     log(f"\n前回 ({old.get('fetchedAt', 'なし')}) からの変更: {len(diffs)}件")
     for d in diffs:
         log("  " + d)

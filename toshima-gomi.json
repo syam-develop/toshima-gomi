@@ -3,7 +3,7 @@
     "source": "豊島区ごみ分別アプリWeb版",
     "sourceUrl": "https://manage.delight-system.com/threeR/web/init/toshimaku",
     "fetchedAt": "2026-11-24",
-    "disclaimer": "非公式データ。豊島区ごみ分別アプリWeb版の収集日カレンダーから、取得日時点の収集曜日を読み取ったものです。その後の変更や、年末年始などの臨時の変更は反映されません。最新情報は豊島区公式サイトを参照。",
+    "disclaimer": "非公式データ。豊島区ごみ分別アプリWeb版の収集日カレンダーから、取得日時点の収集曜日と収集の無い日(年末年始など)を読み取ったものです。取得日より後の変更は反映されません。最新情報は豊島区公式サイトを参照。",
     "rules": {
       "deadlineNormal": "08:00",
       "deadlineDowntown": "07:30",
@@ -18,6 +18,7 @@
       "metalCeramicGlass": "金属・陶器・ガラスごみ"
     }
   },
+  "closedDates": ["2026-12-31", "2027-01-01", "2027-01-02"],
   "areas": [
     {
       "id": "ikebukuro-1-4",

@@ -680,11 +680,25 @@ function nthOccurrenceOfWeekday(date) {
 }
 
 /**
+ * 公式カレンダーで収集が無いとされている日(年末年始など)か。
+ * DATA.closedDates は "2026-12-31" 形式で、曜日のルールでは表せない区内共通の例外。
+ * (|| [] は、公開直後に新しいページと古い toshima-gomi.json が組み合わさった場合の保険)
+ */
+function isClosedDate(date) {
+  const pad = n => String(n).padStart(2, "0");
+  const key = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return (DATA.closedDates || []).includes(key);
+}
+
+/**
  * 指定エリア・指定日に収集される品目キーの配列を返す(表示順)。
  * burnable / bottleCanPet / paperPlastic は毎週(曜日配列)、
  * metalCeramicGlass のみ「第n曜日」指定。
+ * 収集の無い日 (isClosedDate) は、曜日が合っていても空を返す。ホーム・カレンダー・
+ * 印刷はすべてここを通るので、判定はこの1か所だけでよい。
  */
 function collectionsOn(area, date) {
+  if (isClosedDate(date)) return [];
   const wd = WEEKDAY_KEYS[date.getDay()];
   const result = [];
   for (const key of CATEGORY_ORDER) {
