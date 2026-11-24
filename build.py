@@ -8,10 +8,10 @@ index.template.html のプレースホルダに以下を注入する:
                         (分別辞典774品目 / FAQ / 連絡先 / 便利帳画像)
 
 収集曜日データ (toshima-gomi.json) は埋め込まず、ページ起動時に fetch で
-読み込む。データ更新時は toshima-gomi.json を差し替えるだけでよく、
-このスクリプトの再実行は template や app-data.json を変えたときだけ必要。
+読み込む。このスクリプトの再実行が要るのは template か app-data.json を
+変えたとき (crawl.py は両方の JSON を同時に更新するので、実行したら毎回)。
 
-app-data.json を公式Web版
+app-data.json と toshima-gomi.json を公式Web版
 https://manage.delight-system.com/threeR/web/init/toshimaku
 の最新内容で作り直すには crawl.py を使う。
 """

@@ -558,13 +558,12 @@
 "use strict";
 
 /* =====================================================================
- * 収集曜日データ (toshima-gomi.json をインライン化)
- * 出典: 豊島区「資源回収・ごみ収集曜日一覧(50音順)」令和8年4月発行
- * file:// で開いても動くよう fetch は使わず埋め込みにしている。
- * 元の toshima-gomi.json を更新したら、この定数も同期させること。
+ * 収集曜日データ (toshima-gomi.json。crawl.py が公式の収集日カレンダーから
+ * 作る。取得日は DATA.meta.fetchedAt)
+ * 出典: 豊島区ごみ分別アプリWeb版 (manage.delight-system.com/threeR)
+ * ここには埋め込まず、起動時に同じディレクトリの toshima-gomi.json を fetch で
+ * 読み込む (データ更新時は JSON を差し替えるだけで build.py 不要)。
  * ===================================================================== */
-// 収集曜日データは埋め込みをやめ、起動時に同ディレクトリの toshima-gomi.json を
-// fetch で読み込む (データ更新時は JSON を差し替えるだけで build.py 不要)。
 let DATA = null;
 
 /* =====================================================================
@@ -791,13 +790,22 @@ function bindHeader() {
   const ca = document.getElementById("changeArea");
   if (ca) ca.onclick = () => renderSetup("town");
 }
+/** 出典の取得日。収集曜日 (DATA) も分別辞典など (APP_DATA) も同じ公式Web版を
+ *  同じときに取得したものなので、日付は1つだけ出す。片方だけ差し替えられて
+ *  食い違った場合は、嘘にならないよう両方を出す。 */
+function fetchedAtText() {
+  const schedule = DATA.meta.fetchedAt, others = APP_DATA.fetchedAt;
+  return schedule === others
+    ? `${schedule}取得`
+    : `収集曜日: ${schedule}取得 / 分別辞典など: ${others}取得`;
+}
 function footerHtml() {
   return `<footer>
     非公式アプリです。最新情報は
     <a href="https://www.city.toshima.lg.jp/" target="_blank" rel="noopener">豊島区公式サイト</a>
     で確認してください。<br>
     祝日も通常どおり収集(年末年始のみ休止)。荒天時は遅延・中止の場合があります。<br>
-    出典: ${esc(DATA.meta.source)} / 豊島区ごみ分別アプリWeb版(${esc(APP_DATA.fetchedAt)}取得)<br>
+    出典: <a href="${esc(DATA.meta.sourceUrl)}" target="_blank" rel="noopener">${esc(DATA.meta.source)}</a>(${esc(fetchedAtText())})<br>
     <a href="privacy.html">プライバシーポリシー</a>
   </footer>`;
 }

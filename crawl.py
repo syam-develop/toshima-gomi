@@ -1,15 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""公式ごみ分別アプリWeb版を再クロールして app-data.json を作り直す。
+"""公式ごみ分別アプリWeb版を再クロールして、app-data.json と toshima-gomi.json を
+作り直す。このアプリのデータの出典は公式Web版だけで、すべてここから取る。
 
-  python3 crawl.py            # 取得 → 差分表示 → app-data.json を上書き
+  python3 crawl.py            # 取得 → 差分表示 → 2つのJSONを上書き
   python3 crawl.py --dry-run  # 取得と差分表示だけ (書き込まない)
 
 取得元: https://manage.delight-system.com/threeR/web/ (jichitaiId=toshimaku)
-  bunbetsu   → jiten    分別辞典
-  faq        → faq      よくある質問
-  contact    → contacts 粗大ごみ申込 / 家電等の処分 / 食べきり協力店 / お問い合わせ先
-  benri      → benri    便利帳 (ポスター画像は benriImg へ POST して data URI 化)
+
+  app-data.json
+    bunbetsu   → jiten    分別辞典
+    faq        → faq      よくある質問
+    contact    → contacts 粗大ごみ申込 / 家電等の処分 / 食べきり協力店 / お問い合わせ先
+    benri      → benri    便利帳 (ポスター画像は benriImg へ POST して data URI 化)
+
+  toshima-gomi.json
+    selectArea → 地域の一覧 (町 → 丁目 → 番 → 号。末端の地域ごとに areaId が付く)
+    calendar   → areas[] の収集曜日・zone (末端の地域ごとに収集日カレンダーを
+                 1か月ぶん取り、「毎週◯曜」「第n◯曜」のルールに読み替える)
+
+収集曜日について:
+  エリアの区切り (id・町名・丁目・表示名・番地条件) は公式には無く、こちらで
+  決めている。toshima-gomi.json の areas[].officialAreas に「このエリアは公式の
+  どの地域にあたるか」が書いてあり、その対応を使って曜日と zone だけを入れ替える。
+  公式側で地域が増減・改名されたら、対応が取れなくなった地域を挙げて止まるので、
+  officialAreas (必要ならエリアの区切り) を直してから再実行する。
+
+  公式の全地域 (約90) のカレンダーを1ページずつ取るため、4分ほどかかる
+  (1ページ約1.7MB。サーバに負荷をかけないよう1リクエストごとに待つ)。
 
 取得しないもの:
   info (区からのお知らせ) — 台風・年末年始などの時事情報で、スナップショットに
@@ -21,7 +39,7 @@
   から品目名をキーに引き継ぐ。公式に新しい品目が増えたら yomi は空で出力して
   警告するので、app-data.json に手で読みを書き足すこと。
 
-地域ID (areaId) は付けずに取得する。辞典・FAQ・連絡先は区内共通で、
+辞典・FAQ・連絡先・便利帳は地域ID (areaId) を付けずに取得する。区内共通で、
 地域を指定してもしなくても内容は変わらない。
 
 標準ライブラリのみで動く (便利帳の画像が公式で更新されたときだけ、縮小の
@@ -29,7 +47,9 @@
 """
 import argparse
 import base64
+import calendar
 import datetime
+import hashlib
 import html as htmllib
 import json
 import os
@@ -41,10 +61,13 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DEFAULT = os.path.join(HERE, "app-data.json")
+SCHEDULE_DEFAULT = os.path.join(HERE, "toshima-gomi.json")
 
 BASE = "https://manage.delight-system.com/threeR/web"
 JICHITAI = "toshimaku"
 WAIT_SEC = 1.0
+RETRIES = 3          # 通信エラー時の試行回数 (全体で140リクエストほどあるため)
+RETRY_WAIT_SEC = 5.0
 
 # 便利帳ポスター画像の縮小設定 (shrink_image 参照)
 BENRI_WIDTH = 520
@@ -96,7 +119,10 @@ def fetch(path, params, post=False):
     """
     cache_file = None
     if _cache_dir[0]:
-        name = re.sub(r"[^\w.=-]", "_", f"{path}_{urllib.parse.urlencode(params)}")
+        query = urllib.parse.urlencode(params)
+        name = re.sub(r"[^\w.=-]", "_", f"{path}_{query}")
+        if len(name) > 150:  # 地域名 (日本語) を含む問い合わせはファイル名の上限を超えうる
+            name = f"{path}_{hashlib.sha1(query.encode()).hexdigest()}"
         cache_file = os.path.join(_cache_dir[0], name)
         if os.path.exists(cache_file):
             return open(cache_file, "rb").read()
@@ -108,9 +134,6 @@ def fetch(path, params, post=False):
 
 
 def fetch_live(path, params, post):
-    wait = WAIT_SEC - (time.monotonic() - _last_request[0])
-    if wait > 0:
-        time.sleep(wait)
     query = urllib.parse.urlencode(params)
     url = f"{BASE}/{path}"
     req = urllib.request.Request(
@@ -118,12 +141,19 @@ def fetch_live(path, params, post):
         data=query.encode() if post else None,
         headers={"User-Agent": "Mozilla/5.0 (compatible; snapshot-crawler)"},
     )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as res:
-            body = res.read()
-    finally:
-        _last_request[0] = time.monotonic()
-    return body
+    for attempt in range(1, RETRIES + 1):
+        wait = WAIT_SEC - (time.monotonic() - _last_request[0])
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            with urllib.request.urlopen(req, timeout=60) as res:
+                return res.read()
+        except OSError:  # 一時的な通信エラーなら待って取り直す。最後の1回はそのまま上げる
+            if attempt == RETRIES:
+                raise
+            time.sleep(RETRY_WAIT_SEC)
+        finally:
+            _last_request[0] = time.monotonic()
 
 
 def fetch_html(path, **params):
@@ -421,6 +451,292 @@ def crawl_benri(log, old_benri, old_fetched_at):
 
 
 # ─────────────────────────────────────────────────────────────────
+# 収集曜日 (toshima-gomi.json)
+# ─────────────────────────────────────────────────────────────────
+
+# 曜日キー。datetime.date.weekday() の並び (月曜=0)
+WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+# 公式カレンダーの種別名 → 読み取り用のキー。
+# 紙とプラスチックは公式では別の種別だが、アプリは同じ日に集める前提で
+# paperPlastic の1項目にまとめている (別の日になったら rules_from_calendar が止める)。
+CALENDAR_KINDS = {
+    "燃やすごみ": "burnable",
+    "資源（びん・かん・ペットボトル）": "bottleCanPet",
+    "資源（段ボール・紙・布類）": "paper",
+    "資源（プラスチック）": "plastic",
+    "金属・陶器・ガラスごみ": "metalCeramicGlass",
+}
+
+# 繁華街の地域に公式が付けている注記。これが付いた地域を zone=downtown にする。
+# 締切時刻 (朝7:30) は toshima-gomi.json の meta.rules.deadlineDowntown と両アプリの
+# コードに書いてあるので、文言が少しでも変わったら止めて人が確認する。
+DOWNTOWN_NOTE = "池袋駅周辺繁華街地域です。収集曜日の朝７時３０分までに、指定の場所にお出しください。"
+
+# crawl_schedule が公式の値で置き換える areas[] の項目 (これ以外は手で管理している)
+SCHEDULE_FIELDS = ["zone", "bottleCanPet", "paperPlastic", "burnable", "metalCeramicGlass"]
+
+
+def pick_sample_month(today):
+    """収集曜日の読み取りに使う公式カレンダーの (年, 月) を決める (--month 省略時)。
+
+    1か月ぶんの収集日から曜日のルールを逆算するので、その月が規則どおりに
+    並んでいないと読み取れない (rules_from_calendar が中止する)。
+    公式カレンダーで確かめたこと (2026-11 時点):
+      - 12月は31日、1月は1〜3日の収集が載っていない (年末年始の休み)。
+        その日が収集日にあたる地域で「毎週」「第1・3」が崩れるので読み取れない
+      - 祝日には通常どおり収集が載っている (2026年11月・2027年4月で確認)
+      - 過去の月 (2026年4月) も、来年度の月 (2027年4月) も同じルールで返ってくる
+
+    TODO: いまは単純に「今月」を返している。12月・1月に実行すると読み取れずに
+    中止するので、そのときどの月を使うかをここで決める。
+    """
+    return today.year, today.month
+
+
+def select_area(*names):
+    """公式の地域選択ダイアログと同じ問い合わせ。names で指定した階層
+    (町 / 町・丁目 / 町・丁目・番) の1つ下の選択肢を返す。"""
+    params = {"menu": "calendar", "jichitaiId": JICHITAI, "lang": "ja"}
+    params.update({f"area{i}": name for i, name in enumerate(names, 1)})
+    return json.loads(fetch("selectArea", params, post=True))
+
+
+def crawl_official_areas(calendar_page):
+    """公式の地域を末端まで辿る。戻り値: {path: {"areaId", "note"}}
+
+    path は「池袋/2丁目/14番/5・8号」のように各階層の名前を / でつないだもの
+    (町全体で1地域なら「池袋本町」)。areas[].officialAreas がこれを参照する。
+    areaId は公式側で振り直されうるので保存せず、毎回ここで引き直す。
+    """
+    block = re.search(r'<select id="cmbArea1".*?</select>', calendar_page, re.S)
+    towns = re.findall(r'<option value="\d+">([^<]+)</option>',
+                       block.group(0)) if block else []
+    if not towns:
+        raise CrawlError("地域選択の町名一覧が見つかりません (ページ構造が変わった可能性)")
+    found = {}
+
+    def walk(names):
+        # 応答の各行は「1つ下の階層の名前」と「その下にある末端の地域の数」を持つ。
+        # 町を指定した応答なら area_name2 が丁目 (町全体で1地域なら空)。
+        rows = select_area(*names)
+        if not rows:
+            raise CrawlError(f"地域 {'/'.join(names)}: 選択肢が返ってきません")
+        for row in rows:
+            name = (row.get(f"area_name{len(names) + 1}") or "").strip()
+            path = names + (name,) if name else names
+            where = "/".join(path)
+            if row["area_id_count"] > 1:
+                # まだ下の階層がある。問い合わせに使える階層は3つ (area1〜area3) まで
+                if not name or len(path) > 3:
+                    raise CrawlError(f"地域 {where}: 階層を辿れません (構造が変わった可能性)")
+                before = len(found)
+                walk(path)
+                if len(found) - before != row["area_id_count"]:
+                    raise CrawlError(f"地域 {where}: 末端の数が公式の件数と合いません")
+            elif where in found:
+                raise CrawlError(f"地域 {where}: 同じ名前の地域が2つあります")
+            else:
+                found[where] = {"areaId": row["area_id"],
+                                "note": (row.get("note") or "").strip()}
+
+    for town in towns:
+        walk((text_of(town),))
+    return found
+
+
+def zone_of(path, note):
+    if not note:
+        return "normal"
+    if note == DOWNTOWN_NOTE:
+        return "downtown"
+    raise CrawlError(
+        f"地域 {path}: 注記が想定と違います: {note!r}\n"
+        "繁華街の締切時刻などが変わっていないか確認し、DOWNTOWN_NOTE "
+        "(必要ならアプリ側の締切時刻) を直してから再実行してください")
+
+
+# カレンダーの表の1マス。月の前後の空きマスは class="td td" で、日付の番号が付かない
+CALENDAR_CELL_RE = re.compile(r'<td class="td td(\d*)">(.*?)</td>', re.S)
+KIND_NAME_RE = re.compile(r'<span class="trash_kind_name">(.*?)</span>', re.S)
+
+
+def fetch_calendar(area_id, year, month):
+    # month は必ず2桁で渡す。1桁だと公式サーバは別の年月として解釈する
+    # (year=2027&month=4 で2030年4月の表が返る)。parse_calendar の説明も参照。
+    return fetch_html("calendar", menu="calendar", areaId=area_id,
+                      year=year, month=f"{month:02d}")
+
+
+def parse_calendar(page, path, year, month):
+    """収集日カレンダー1か月ぶん → {日: [種別名…]} (収集の無い日は空リスト)
+
+    頼んだ地域・頼んだ月のページであることを確かめてから読む。公式サーバは
+    指定を解釈できないとき、エラーにせず別の地域や別の月を返してくる。特に月は、
+    見出しには頼んだ年月をそのまま出すのに、表の中身は別の月ということがある
+    (fetch_calendar 参照)。見出しでは気づけないので、表の日付が本物の暦と同じ
+    曜日の列に並んでいるかで確かめる。
+    """
+    shown = re.search(r'<span id="selectedArea">(.*?)</span>', page, re.S)
+    ym = re.search(r'<span class="disp_date">\s*(\d{4})年(\d{1,2})月', page)
+    begin = page.find('<table class="calendar')
+    end = page.find('<div class="trash_kind_legend">')
+    if not shown or not ym or not 0 <= begin < end:
+        raise CrawlError(f"地域 {path}: 収集日カレンダーを読めません (ページ構造が変わった可能性)")
+    if text_of(shown.group(1)) != path.replace("/", ""):
+        raise CrawlError(f"地域 {path}: 別の地域 ({text_of(shown.group(1))}) のカレンダーが返ってきました")
+    if (int(ym.group(1)), int(ym.group(2))) != (year, month):
+        raise CrawlError(f"地域 {path}: {year}年{month}月を頼んだのに "
+                         f"{ym.group(1)}年{ym.group(2)}月のカレンダーが返ってきました")
+
+    last_day = calendar.monthrange(year, month)[1]
+    days = {}
+    for row in re.findall(r"<tr>(.*?)</tr>", page[begin:end], re.S):
+        for column, (day, cell) in enumerate(CALENDAR_CELL_RE.findall(row)):
+            if not day:
+                continue
+            day = int(day)
+            # 表は日曜始まり (列0=日曜)。date.weekday() は月曜=0
+            if (day in days or not 1 <= day <= last_day
+                    or column != (datetime.date(year, month, day).weekday() + 1) % 7):
+                raise CrawlError(
+                    f"地域 {path}: 表の日付の並びが {year}年{month}月の暦と合いません "
+                    f"({day}日が{'日月火水木金土'[column % 7]}曜の列)。"
+                    "別の月の表が返ってきた可能性があります")
+            days[day] = [text_of(kind) for kind in KIND_NAME_RE.findall(cell)]
+    if len(days) != last_day:
+        raise CrawlError(f"地域 {path}: カレンダーの日付が{len(days)}日ぶんしかありません "
+                         "(ページ構造が変わった可能性)")
+    return days
+
+
+def rules_from_calendar(days, year, month, path):
+    """1か月ぶんの収集日 → 曜日のルール (areas[] の収集曜日4項目)。
+
+    公式カレンダーは「何日に何を集めるか」しか持たないので、ここで
+      燃やすごみ / びん・かん・ペットボトル / 紙・プラスチック → 毎週◯曜
+      金属・陶器・ガラスごみ                                 → 第1・3 か 第2・4 ◯曜
+    に読み替える。「第n◯曜」は「その月に n 回目に来るその曜日」なので日付だけで
+    決まる (1〜7日が1回目、8〜14日が2回目…。アプリ側の判定と同じ数え方)。
+
+    この読み替えが成り立たない月は、間違ったルールを作らずに止める
+    (どんな月がそうなるかは pick_sample_month を参照)。
+    """
+    weekday_of = lambda day: WEEKDAYS[datetime.date(year, month, day).weekday()]
+    times_in_month = dict.fromkeys(WEEKDAYS, 0)          # 各曜日がその月に何回あるか
+    seen = {key: {} for key in CALENDAR_KINDS.values()}  # キー → {曜日: [何回目…]}
+    for day, kinds in sorted(days.items()):
+        times_in_month[weekday_of(day)] += 1
+        for kind in kinds:
+            if kind not in CALENDAR_KINDS:
+                raise CrawlError(
+                    f"地域 {path}: 未知の収集種別 {kind!r}。新しい種別なら CALENDAR_KINDS と "
+                    "両アプリの収集日の計算に追加してから再実行してください")
+            nths = seen[CALENDAR_KINDS[kind]].setdefault(weekday_of(day), [])
+            nths.append((day + 6) // 7)
+            if len(set(nths)) != len(nths):
+                raise CrawlError(f"地域 {path}: {month}月{day}日に {kind} が重複しています")
+
+    hint = (f"{year}年{month}月のカレンダーからは曜日のルールを読み取れません。"
+            "規則どおりの月を --month で指定してください")
+    weekly = {}
+    for key in ("burnable", "bottleCanPet", "paper", "plastic"):
+        if not seen[key]:
+            raise CrawlError(f"地域 {path}: {key} の収集日がありません。{hint}")
+        for weekday, nths in seen[key].items():
+            if len(nths) != times_in_month[weekday]:
+                raise CrawlError(f"地域 {path}: {key} が {weekday} の毎週ではなく "
+                                 f"第{nths} だけにあります。{hint}")
+        weekly[key] = sorted(seen[key], key=WEEKDAYS.index)
+    if weekly["paper"] != weekly["plastic"]:
+        raise CrawlError(
+            f"地域 {path}: 紙 ({weekly['paper']}) とプラスチック ({weekly['plastic']}) の"
+            "曜日が違います。アプリは同じ日に集める前提なので、データの持ち方から見直しが必要です")
+    metal = seen["metalCeramicGlass"]
+    if len(metal) != 1 or next(iter(metal.values())) not in ([1, 3], [2, 4]):
+        raise CrawlError(f"地域 {path}: 金属・陶器・ガラスごみが「第1・3」「第2・4」の"
+                         f"どちらでもありません: {metal}。{hint}")
+    (weekday, nth), = metal.items()
+    return {"bottleCanPet": weekly["bottleCanPet"],
+            "paperPlastic": weekly["paper"],
+            "burnable": weekly["burnable"],
+            "metalCeramicGlass": {"weekday": weekday, "nth": nth}}
+
+
+def crawl_schedule(log, old_areas, year, month):
+    """areas[] の収集曜日と zone (SCHEDULE_FIELDS) を公式の値で置き換えて返す。
+
+    エリアの区切りは old_areas のまま。各エリアの officialAreas に挙げた公式の
+    地域をすべて読み、その中で値が割れたら (= 区切りが公式と合わなくなったら) 止める。
+    """
+    official = crawl_official_areas(fetch_html("calendar", menu="calendar"))
+    owner = {}
+    for area in old_areas:
+        if not area.get("officialAreas"):
+            raise CrawlError(f"エリア {area['id']}: officialAreas がありません")
+        for path in area["officialAreas"]:
+            if path in owner:
+                raise CrawlError(f"公式の地域 {path} が2つのエリア "
+                                 f"({owner[path]}, {area['id']}) に入っています")
+            owner[path] = area["id"]
+    gone = sorted(set(owner) - set(official))
+    added = sorted(set(official) - set(owner))
+    if gone or added:
+        raise CrawlError(
+            "公式の地域と toshima-gomi.json の officialAreas が対応しません "
+            "(公式側で地域が増減・改名された可能性)。\n"
+            + "".join(f"  公式に見つからない: {p} (エリア {owner[p]})\n" for p in gone)
+            + "".join(f"  どのエリアにも入っていない公式の地域: {p}\n" for p in added)
+            + "officialAreas (必要ならエリアの区切り) を直してから再実行してください")
+    log(f"  公式の{len(official)}地域を{len(old_areas)}エリアに対応付け。"
+        f"{year}年{month}月のカレンダーから読み取ります")
+
+    new_areas = []
+    for count, area in enumerate(old_areas, 1):
+        read = {}
+        for path in area["officialAreas"]:
+            page = fetch_calendar(official[path]["areaId"], year, month)
+            days = parse_calendar(page, path, year, month)
+            read[path] = {"zone": zone_of(path, official[path]["note"]),
+                          **rules_from_calendar(days, year, month, path)}
+        first = area["officialAreas"][0]
+        for path, values in read.items():
+            if values != read[first]:
+                raise CrawlError(
+                    f"エリア {area['id']} の中で公式の値が割れています:\n"
+                    f"  {first}: {short(read[first], 200)}\n"
+                    f"  {path}: {short(values, 200)}\n"
+                    "エリアを分けるなど、toshima-gomi.json の区切りを直してください")
+        new_areas.append({**area, **read[first]})
+        if count % 10 == 0 or count == len(old_areas):
+            log(f"  {count}/{len(old_areas)}エリア")
+    return new_areas
+
+
+def dump_schedule(data):
+    """toshima-gomi.json の書式 (1項目1行・配列は1行) の文字列にする。
+
+    json.dumps(indent=2) だと配列が1要素1行に開き、58エリアで行数が倍以上に
+    なって、曜日が変わったときの差分が読みにくい。
+    """
+    one = lambda value: json.dumps(value, ensure_ascii=False)
+    meta = json.dumps(data["meta"], ensure_ascii=False, indent=2).replace("\n", "\n  ")
+    blocks = []
+    for area in data["areas"]:
+        rows = []
+        for key, value in area.items():
+            if key == "metalCeramicGlass":
+                text = '{ "weekday": %s, "nth": %s }' % (one(value["weekday"]),
+                                                          one(value["nth"]))
+            else:
+                text = one(value)
+            rows.append(f"      {one(key)}: {text}")
+        blocks.append("    {\n" + ",\n".join(rows) + "\n    }")
+    return ('{\n  "meta": ' + meta + ',\n  "areas": [\n'
+            + ",\n".join(blocks) + "\n  ]\n}\n")
+
+
+# ─────────────────────────────────────────────────────────────────
 # 差分表示
 # ─────────────────────────────────────────────────────────────────
 
@@ -466,11 +782,30 @@ def diff_snapshot(old, new):
     return out
 
 
+def diff_schedule(old_areas, new_areas):
+    out = []
+    diff_keyed("areas", old_areas, new_areas, lambda a: a["id"], SCHEDULE_FIELDS, out)
+    return out
+
+
 # ─────────────────────────────────────────────────────────────────
+
+def month_arg(text):
+    m = re.fullmatch(r"(\d{4})-(\d{1,2})", text)
+    if not m or not 1 <= int(m.group(2)) <= 12:
+        raise argparse.ArgumentTypeError("YYYY-MM の形で指定してください (例: 2026-11)")
+    return int(m.group(1)), int(m.group(2))
+
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--out", default=OUT_DEFAULT, help="出力先 (既定: app-data.json)")
+    ap.add_argument("--schedule", default=SCHEDULE_DEFAULT,
+                    help="収集曜日データ。エリアの区切りをここから読み、曜日を"
+                         "入れ替えて書き戻す (既定: toshima-gomi.json)")
+    ap.add_argument("--month", type=month_arg, metavar="YYYY-MM",
+                    help="収集曜日を読み取る公式カレンダーの月 "
+                         "(省略時は pick_sample_month が決める)")
     ap.add_argument("--dry-run", action="store_true", help="差分表示だけで書き込まない")
     ap.add_argument("--cache", metavar="DIR",
                     help="応答を DIR に保存して再利用する (パーサ調整用)")
@@ -484,6 +819,12 @@ def main():
         old = {}
     yomi_by_name = {it["name"]: it["yomi"] for it in old.get("jiten", [])
                     if it.get("yomi")}
+    try:
+        old_schedule = json.load(open(args.schedule, encoding="utf-8"))
+    except OSError as e:  # エリアの区切りは公式に無いので、これが無いと作れない
+        print(f"中止: 収集曜日データ (エリアの区切り) を読めません: {e}", file=sys.stderr)
+        return 1
+    year, month = args.month or pick_sample_month(datetime.date.today())
 
     try:
         log("分別辞典を取得中…")
@@ -498,6 +839,8 @@ def main():
         contacts = crawl_contacts(log, faq_page)
         log("便利帳を取得中…")
         benri = crawl_benri(log, old.get("benri", []), old.get("fetchedAt"))
+        log("収集曜日を取得中… (公式の全地域のカレンダーを取るので4分ほどかかります)")
+        areas = crawl_schedule(log, old_schedule["areas"], year, month)
     except CrawlError as e:
         print(f"\n中止: {e}", file=sys.stderr)
         return 1
@@ -505,12 +848,17 @@ def main():
         print(f"\n中止: 公式Web版を取得できません: {e}", file=sys.stderr)
         return 1
 
+    # 2つのファイルは同じ出典を同じときに取ったものなので、取得日を揃える
+    # (アプリの出典表示は、この日付を1つだけ出す)
+    today = datetime.date.today().isoformat()
     new = {"jiten": jiten, "faq": faq, "contacts": contacts, "benri": benri,
-           "fetchedAt": datetime.date.today().isoformat()}
+           "fetchedAt": today}
+    new_schedule = {"meta": {**old_schedule["meta"], "fetchedAt": today},
+                    "areas": areas}
 
     for name, raw, cat in aliased:
         log(f"\n表記ゆれを補正: {name} の区分「{raw}」→「{cat}」")
-    diffs = diff_snapshot(old, new)
+    diffs = diff_snapshot(old, new) + diff_schedule(old_schedule["areas"], areas)
     log(f"\n前回 ({old.get('fetchedAt', 'なし')}) からの変更: {len(diffs)}件")
     for d in diffs:
         log("  " + d)
@@ -525,7 +873,10 @@ def main():
         return 0
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(new, f, ensure_ascii=False)
-    log(f"\n{args.out} を更新しました。python3 build.py で index.html を再生成してください")
+    with open(args.schedule, "w", encoding="utf-8") as f:
+        f.write(dump_schedule(new_schedule))
+    log(f"\n{args.out} と {args.schedule} を更新しました。python3 build.py で "
+        "index.html を再生成し、iOS版にも反映してください (手順は ../README.md)")
     return 0
 
 

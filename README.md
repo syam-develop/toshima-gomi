@@ -11,35 +11,29 @@ GitHub Pages で公開している単一ページの Web アプリ。
 
 | ファイル | 役割 |
 |---|---|
-| `toshima-gomi.json` | **収集曜日データ**(区の収集曜日一覧PDF由来)。ページ起動時に fetch で読み込む |
+| `toshima-gomi.json` | **収集曜日データ**(公式ごみ分別アプリWeb版の収集日カレンダーから作る)。ページ起動時に fetch で読み込む |
 | `app-data.json` | 公式ごみ分別アプリWeb版のスナップショット(分別辞典774品目・FAQ・連絡先・便利帳画像) |
-| `crawl.py` | 公式Web版を再クロールして `app-data.json` を作り直す |
+| `crawl.py` | 公式Web版を再クロールして `app-data.json` と `toshima-gomi.json` を作り直す |
 | `index.template.html` | ページ本体のテンプレート(CSS/JS 含む) |
 | `build.py` | `index.template.html` + `app-data.json` → `index.html` を生成 |
 | `index.html` | **生成物。直接編集しないこと**(build.py で上書きされる) |
 
 ## データ更新の手順
 
-### 収集曜日データ(toshima-gomi.json)を更新する場合
+データの出典は公式ごみ分別アプリWeb版だけ。収集曜日も分別辞典なども、`crawl.py` が
+1回の実行でまとめて取得する(取得日 `fetchedAt` は2つのファイルで同じになる)。
 
-1. マスターは `../Shared/toshima-gomi.json`(iOS版と共有)。そちらを更新してから、ここへコピーする
-
-   ```sh
-   cp ../Shared/toshima-gomi.json toshima-gomi.json
-   ```
-
-2. コミットして公開するだけ。**build.py の再実行は不要**(実行時に fetch で読むため)
-
-### 分別辞典・連絡先など(app-data.json)を公式の最新に更新する場合
+### 公式の最新に更新する場合
 
 ```sh
 python3 crawl.py --dry-run   # 公式Web版を取得し、前回からの変更点を表示(書き込まない)
-python3 crawl.py             # 問題なければ app-data.json を上書き
+python3 crawl.py             # 問題なければ app-data.json と toshima-gomi.json を上書き
 python3 build.py             # index.html を再生成
 ```
 
 を実行し、続けて iOS版にも反映してから(`../README.md` の「公式データの更新手順」)、
-コミットして公開する。
+コミットして公開する。公式の全地域(94件)の収集日カレンダーを1ページずつ取るので、
+4分ほどかかる。
 
 - 分別辞典の読み仮名 `yomi` は公式に無い自前データ。既存の値を品目名で引き継ぐので、
   公式に品目が増えたときは警告に出た品目の `yomi` を `app-data.json` に手で書き足す
@@ -48,6 +42,14 @@ python3 build.py             # index.html を再生成
 - **「区からのお知らせ」は取得しない。** 台風・年末年始などの時事情報は
   スナップショットにすると古い告知が残り続けるため、載せない方針
 - 便利帳の画像は、公式側で更新されたものだけ縮小し直す(このときだけ Pillow が必要)
+- 収集曜日は、公式の収集日カレンダー1か月ぶんから「毎週◯曜」「第n◯曜」を読み取る。
+  年末年始の休みを含む月(12月・1月)は読み取れずに止まるので、
+  `python3 crawl.py --month 2027-02` のように別の月を指定する
+- `toshima-gomi.json` のエリアの区切り(id・表示名・番地条件)は公式には無く、
+  こちらで決めている。各エリアの `officialAreas` に対応する公式の地域を書いてあり、
+  `crawl.py` はその対応を使って曜日と `zone` だけを入れ替える。公式側で地域が
+  増減・改名されると、該当の地域を挙げて止まるので `officialAreas` を直す
+  (くわしくは `../README.md` の「収集曜日の取得のしくみ」)
 
 ### テンプレート(index.template.html)を変更した場合
 
@@ -69,4 +71,4 @@ python3 -m http.server 8000
 
 ## 関連
 
-- iOS版(SwiftUI + WidgetKit)は本体リポジトリの直下にある。データの出典・照合手順は `../README.md` を参照。
+- iOS版(SwiftUI + WidgetKit)は本体リポジトリの直下にある。iOS版へのデータの反映手順は `../README.md` を参照。
