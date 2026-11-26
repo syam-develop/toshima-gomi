@@ -17,6 +17,7 @@ GitHub Pages で公開している単一ページの Web アプリ。
 | `index.template.html` | ページ本体のテンプレート(CSS/JS 含む) |
 | `build.py` | `index.template.html` + `app-data.json` → `index.html` を生成 |
 | `index.html` | **生成物。直接編集しないこと**(build.py で上書きされる) |
+| `googlec85bd6fe5bbf1558.html` | Google Search Console の所有権確認ファイル。**消さないこと**(消すと確認が外れ、検索での表示回数・クリック数が見られなくなる) |
 
 ## データ更新の手順
 
