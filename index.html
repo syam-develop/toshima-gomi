@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<!-- iPhone の Safari で、画面上部に iOS版のバナー(Apple 標準の Smart App Banner)を出す -->
+<meta name="apple-itunes-app" content="app-id=6797180484">
 <title>豊島区ごみ収集カレンダー(非公式)</title>
 <style>
   :root {
@@ -385,6 +387,23 @@
   #tabbar button svg { width: 22px; height: 22px; }
   #tabbar button.on { color: var(--accent); }
 
+  /* ── iPhoneアプリ版への案内カード ── */
+  /* 1行目にタイトルとボタン、2行目に説明を全幅で置く
+     (横並び1行だとスマホ幅で説明が細く折り返し、カードが縦長になる) */
+  .app-promo {
+    display: grid; grid-template-columns: 1fr auto;
+    align-items: center; column-gap: 10px; row-gap: 6px;
+    margin-top: 14px; text-decoration: none; color: var(--text);
+  }
+  /* 幅375pxの iPhone でタイトルが1行に収まる大きさ(15pxだと1文字はみ出す) */
+  .app-promo .promo-title { font-size: 14px; font-weight: 800; }
+  .app-promo .promo-sub { grid-column: 1 / -1; font-size: 12px; color: var(--sub); line-height: 1.6; }
+  .app-promo .promo-btn {
+    font-size: 12px; font-weight: 700;
+    padding: 7px 11px; border-radius: 999px;
+    background: var(--accent); color: var(--card); white-space: nowrap;
+  }
+
   footer {
     margin-top: 20px; font-size: 11px; color: var(--sub);
     text-align: center; line-height: 1.7;
@@ -431,6 +450,9 @@
     .cat-chips button { font-size: 14px; padding: 8px 15px; }
     .menu-list button { font-size: 17px; padding: 17px 20px; }
     .page-title { font-size: 22px; }
+    .app-promo .promo-title { font-size: 17px; }
+    .app-promo .promo-sub { font-size: 14px; }
+    .app-promo .promo-btn { font-size: 14px; padding: 9px 16px; }
     #tabbar .inner { max-width: 900px; }
     #tabbar button { font-size: 12px; padding: 10px 0 8px; }
     #tabbar button svg { width: 26px; height: 26px; }
@@ -456,7 +478,7 @@
     }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body { background: #fff; padding: 0; }
-    #tabbar, header.app, .seg, .today-banner, .next-card, footer,
+    #tabbar, header.app, .seg, .today-banner, .next-card, .app-promo, footer,
     .cal-head .tools, .cal-head .nav button { display: none !important; }
     .wrap { max-width: none; padding: 0; }
     .card { border: none; box-shadow: none; margin: 0; padding: 0; }
@@ -820,8 +842,25 @@ function footerHtml() {
     で確認してください。<br>
     祝日も通常どおり収集(年末年始のみ休止)。荒天時は遅延・中止の場合があります。<br>
     出典: <a href="${esc(DATA.meta.sourceUrl)}" target="_blank" rel="noopener">${esc(DATA.meta.source)}</a>(${esc(fetchedAtText())})<br>
+    <a href="${APP_STORE_URL}" target="_blank" rel="noopener">iPhoneアプリ版</a> ・
     <a href="privacy.html">プライバシーポリシー</a>
   </footer>`;
+}
+
+/* ---------- iPhoneアプリ版への案内 ---------- */
+// rel に noreferrer を付けないこと。App Store Connect の App Analytics で、
+// このサイトから来た人数が「Webリファラ」として見えるのは参照元が送られるため。
+const APP_STORE_URL = "https://apps.apple.com/jp/app/id6797180484";
+// iOS版は iPhone 専用。Android では入れられないのでカードは出さない
+// (フッターのリンクは App Store の Web ページが開くだけなので残す)。
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+function appPromoHtml() {
+  if (IS_ANDROID) return "";
+  return `<a class="card app-promo" href="${APP_STORE_URL}" target="_blank" rel="noopener">
+    <div class="promo-title">iPhoneアプリもあります</div>
+    <span class="promo-btn">App Storeで見る</span>
+    <div class="promo-sub">無料。収集日の前日夜・当日朝の通知と、ホーム画面・ロック画面のウィジェットに対応。</div>
+  </a>`;
 }
 
 /* ---------- タブバー ---------- */
@@ -993,7 +1032,7 @@ function renderCalView() {
     html += `<div class="card cal-card">${calendarHtml(area, calYear, calMonth, today)}</div>`;
   }
 
-  html += footerHtml();
+  html += appPromoHtml() + footerHtml();
   app.innerHTML = html;
   bindHeader();
 
@@ -1284,7 +1323,7 @@ function renderMenu() {
       `<button data-page="${key}"><span>${esc(label)}${
         note ? `<span class="menu-note">${esc(note)}</span>` : ""
       }</span></button>`).join("") +
-    `</div>` + footerHtml();
+    `</div>` + appPromoHtml() + footerHtml();
   app.innerHTML = html;
   bindHeader();
   app.querySelectorAll("[data-page]").forEach(b =>
