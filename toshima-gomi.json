@@ -1,9 +1,9 @@
 {
   "meta": {
-    "source": "豊島区ごみ分別アプリWeb版",
+    "source": "さんあ～る",
     "sourceUrl": "https://manage.delight-system.com/threeR/web/init/toshimaku",
     "fetchedAt": "2026-11-24",
-    "disclaimer": "非公式データ。豊島区ごみ分別アプリWeb版の収集日カレンダーから、取得日時点の収集曜日と収集の無い日(年末年始など)を読み取ったものです。取得日より後の変更は反映されません。最新情報は豊島区公式サイトを参照。",
+    "disclaimer": "非公式データ。さんあ～るの収集日カレンダーから、取得日時点の収集曜日と収集の無い日(年末年始など)を読み取ったものです。取得日より後の変更は反映されません。最新情報は豊島区公式サイトを参照。",
     "rules": {
       "deadlineNormal": "08:00",
       "deadlineDowntown": "07:30",
