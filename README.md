@@ -18,6 +18,20 @@ GitHub Pages で公開している単一ページの Web アプリ。
 | `build.py` | `index.template.html` + `app-data.json` → `index.html` を生成 |
 | `index.html` | **生成物。直接編集しないこと**(build.py で上書きされる) |
 | `googlec85bd6fe5bbf1558.html` | Google Search Console の所有権確認ファイル。**消さないこと**(消すと確認が外れ、検索での表示回数・クリック数が見られなくなる) |
+| `app-icon.png` | iOS版のアプリアイコン(180px)。ヘッダー・ファビコン・アプリへの案内で使う。iOS版のアイコンを変えたら `sips -Z 180 ../ToshimaGomiApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png --out app-icon.png` で作り直す |
+| `appstore-qr.svg` | iOS版の App Store ページの QR コード(PC の画面下部に出す)。`../scripts/make-appstore-qr.swift` で作ったもので、読み取って URL と一致することまで確かめてある。App Store の URL が変わったら作り直す |
+
+## 画面のデザイン
+
+デザインの考え方は「集積所の看板」。アプリアイコン(ティールの地・生成りのごみ箱・太い墨色の輪郭)を下敷きに、
+太い輪郭の板と品目色の帯で組んでいる。色の定義・配置の切り替え(スマホ1列 / 幅1024px以上で2列)・
+印刷用の指定は、すべて `index.template.html` の CSS の先頭にあるコメントとあわせて読むこと。
+
+- **フォントは読み込まない。** Windows では BIZ UDPゴシック、Apple 端末ではヒラギノになる(端末に入っているもの)。
+  Web フォントを使うと、閲覧のたびに外部サーバーへの通信が発生する
+- **日本語の改行位置は手で区切っている。** 品目名などは `CAT_PHRASES` / `CAL_PHRASES` で改行してよい位置に区切り、
+  区切りごとに折り返さない単位で包む(Safari が `word-break: auto-phrase` に対応していないため)。
+  品目名を変えるときはここも直す
 
 ## データ更新の手順
 
