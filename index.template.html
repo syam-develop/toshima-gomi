@@ -12,6 +12,14 @@
 <link rel="icon" type="image/png" href="app-icon.png">
 <link rel="apple-touch-icon" href="app-icon.png">
 <title>豊島区ごみ収集カレンダー(非公式)</title>
+<!-- ?area= 付きで開かれても(町名ページから来たとき)、検索エンジンにはこの URL 1つとして扱わせる -->
+<link rel="canonical" href="https://syam-develop.github.io/toshima-gomi/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="豊島区ごみ収集カレンダー">
+<meta property="og:title" content="豊島区ごみ収集カレンダー(非公式)">
+<meta property="og:description" content="豊島区のごみ収集日を、住んでいる地域ごとに確認できる非公式のカレンダーです。収集する曜日・月間カレンダー・分別辞典をまとめて見られます。">
+<meta property="og:url" content="https://syam-develop.github.io/toshima-gomi/">
+<meta property="og:image" content="https://syam-develop.github.io/toshima-gomi/app-icon.png">
 <style>
   /* =====================================================================
    * デザイン「集積所の看板」
@@ -467,6 +475,9 @@
   }
   .legal { font-size: 12px; line-height: 1.8; color: var(--sub); }
   .legal a { color: var(--text); }
+  /* 町名別・分別辞典などの静的ページ(pages.py が書き出す)へのリンク。検索エンジンが
+     ここからたどれるよう、本体のどの画面の下にも出す */
+  .foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 16px; }
 
   /* ── タブレット以上 ── */
   @media (min-width: 700px) {
@@ -744,7 +755,8 @@ let DATA = null;
  *  - jiten:    分別辞典 774品目 {kana,name,cat,note,kw}
  *  - faq:      よくある質問 {cat,q,a(HTML)}
  *  - contacts: 粗大ごみ申込/家電等処分/食べきり協力店/お問い合わせ先
- *  - benri:    便利帳(分け方・出し方ポスター画像 data URI)
+ *  - benri:    便利帳(分け方・出し方ポスター。img は build.py が benri/ に
+ *              書き出した画像ファイルのパス。app-data.json では data URI)
  * 「区からのお知らせ」(台風・年末年始などの時事情報) は載せない。
  * スナップショットでは古い告知が残り続けるため、公式サイトへの誘導に任せる。
  * ===================================================================== */
@@ -1024,7 +1036,8 @@ function fetchedAtText() {
 function footerHtml() {
   return `<footer class="site-foot">
     ${appPromoHtml()}
-    <p class="legal"><span class="ph">非公式アプリです。</span><span class="ph">最新情報は<a href="https://www.city.toshima.lg.jp/" target="_blank" rel="noopener">豊島区公式サイト</a>で確認してください。</span><span class="ph">祝日も通常どおり収集(年末年始のみ休止)。</span><span class="ph">荒天時は遅延・中止の場合があります。</span><br><span class="ph">出典: ${esc(DATA.meta.source)}</span><span class="ph">(${esc(fetchedAtText())})</span><br><a href="privacy.html">プライバシーポリシー</a></p>
+    <p class="legal"><span class="ph">非公式アプリです。</span><span class="ph">最新情報は<a href="https://www.city.toshima.lg.jp/" target="_blank" rel="noopener">豊島区公式サイト</a>で確認してください。</span><span class="ph">祝日も通常どおり収集(年末年始のみ休止)。</span><span class="ph">荒天時は遅延・中止の場合があります。</span><br><span class="ph">出典: ${esc(DATA.meta.source)}</span><span class="ph">(${esc(fetchedAtText())})</span></p>
+    <p class="legal foot-links"><a href="area/">町名別の収集日</a><a href="jiten/">分別辞典の品目一覧</a><a href="faq/">よくある質問</a><a href="privacy.html">プライバシーポリシー</a></p>
   </footer>`;
 }
 
@@ -1509,7 +1522,7 @@ function renderBenri() {
     `</div>
   </div>` + footerHtml();
 
-  // 画像(data URI 計約2MB)は開いた時に初めて src を与えてデコード負荷を遅延
+  // 画像(計約2MB)は開いた時に初めて src を与え、開かない画像は読み込まない
   app.querySelectorAll("details[data-benri]").forEach(d =>
     d.addEventListener("toggle", () => {
       if (d.open) {
@@ -1625,6 +1638,14 @@ function renderMenuPage(page) {
         エラー: ${esc(e.message)}
       </div></div>`;
     return;
+  }
+  // 町名ページの「この地域のカレンダーを開く」から来たとき(?area=地域ID)は、
+  // その地域を選んだ状態で開く。URL からは消して、再読み込みや共有で地域を
+  // 上書きし続けないようにする
+  const linkedArea = new URLSearchParams(location.search).get("area");
+  if (linkedArea !== null) {
+    if (DATA.areas.some(a => a.id === linkedArea)) localStorage.setItem(STORAGE_KEY, linkedArea);
+    history.replaceState(null, "", location.pathname + location.hash);
   }
   const t = today0();
   calYear = t.getFullYear();

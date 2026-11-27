@@ -1,0 +1,152 @@
+/* =====================================================================
+ * 静的ページ (町名別・品目別・よくある質問。pages.py が書き出す) だけで使う指定。
+ * 色・板・帯・ボタンなどの部品は site.css (= index.template.html の CSS) を
+ * そのまま使い、ここではリンク(a)で組む部分と、静的ページにしか無い部品だけを足す。
+ * 本体はボタン(button)で画面を切り替えるが、静的ページは検索エンジンがたどれる
+ * よう、すべてリンクで組んでいる。
+ * ===================================================================== */
+[hidden] { display: none !important; }
+a.pill-btn { text-decoration: none; }
+.android .promo { display: none; }
+
+/* ── ヘッダー: アイコンとサイト名でトップへ戻る ── */
+.brand-link {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  color: inherit; text-decoration: none;
+}
+.brand-title { display: block; }
+
+/* ── 下部タブバー・PC のメニュー(リンク版) ── */
+#tabbar a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  color: var(--sub); font-size: 11px; font-weight: 700; text-decoration: none;
+}
+#tabbar a.on { color: var(--text); }
+#tabbar a.on .ti { background: var(--brand); color: var(--on-brand); }
+
+/* ── パンくず ── */
+.crumbs ol {
+  list-style: none; display: flex; flex-wrap: wrap; align-items: center;
+  font-size: 13px; line-height: 1.6; color: var(--sub);
+}
+.crumbs li + li::before { content: "›"; margin: 0 7px; }
+.crumbs a { color: var(--text); font-weight: 700; }
+
+/* 品目ページは1列で読ませるので、本体の .narrow より狭くする */
+.narrow.page-narrow { max-width: 760px; }
+
+/* ── 品目ページ: 答え(分別区分)を品目色の大きな帯で出す看板 ── */
+.answer h1.plate-head { font-size: 20px; line-height: 1.45; padding: 12px 16px; }
+.answer-band {
+  display: flex; align-items: center; gap: 14px;
+  padding: 20px 16px; background: var(--c); color: #fff;
+}
+.answer-band .disc {
+  width: 62px; height: 62px; border-radius: 50%; flex: none;
+  background: #fbf7ef; color: var(--c); border: var(--bw) solid var(--outline);
+  display: flex; align-items: center; justify-content: center;
+}
+.answer-band .disc svg { width: 32px; height: 32px; }
+.answer-cat { font-size: 30px; font-weight: 700; line-height: 1.25; min-width: 0; }
+.answer-note {
+  padding: 12px 16px 16px; border-top: var(--bw) solid var(--outline);
+  font-size: 15px; line-height: 1.8;
+}
+
+/* 出す日・拠点回収の案内 */
+.guide-body {
+  padding: 12px 16px 0; font-size: 15px; line-height: 1.8;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.guide-lead { font-size: 15px; line-height: 1.8; }
+
+/* 町名のリンク(本体の町名選択ボタンと同じ形) */
+.link-grid a {
+  min-height: 44px; padding: 8px 16px; border-radius: 12px;
+  border: 2px solid var(--outline); background: var(--plate);
+  display: inline-flex; align-items: center;
+  font-size: 15px; font-weight: 700; text-decoration: none;
+}
+.link-grid a[aria-current] { background: var(--text); color: var(--plate); }
+section > .link-grid:last-child { padding-top: 12px; }
+.narrow > .link-grid { padding: 0; }
+
+/* 同じ分別区分の品目 */
+.chip-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-links a {
+  padding: 7px 14px; border-radius: 999px;
+  border: 2px solid var(--outline); background: var(--plate);
+  font-size: 14px; font-weight: 700; line-height: 1.45; text-decoration: none;
+}
+.narrow > a.pill-btn { align-self: flex-start; }
+
+/* ── 町名ページ ── */
+.notes {
+  list-style: none; display: flex; flex-direction: column; gap: 4px;
+  font-size: 14px; line-height: 1.7; padding: 12px 14px;
+  border: 2px dashed var(--outline); border-radius: 12px;
+}
+.notes li { padding-left: 1em; position: relative; }
+.notes li::before { content: "・"; position: absolute; left: 0; }
+.area-grid { display: flex; flex-direction: column; gap: 16px; }
+.zone-tag {
+  display: inline-block; margin-left: 8px; padding: 1px 9px; border-radius: 999px;
+  background: var(--text); color: var(--plate);
+  font-size: 12px; line-height: 1.6; vertical-align: 2px;
+}
+.plate-foot {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 10px; padding: 10px 12px 10px 16px; border-top: var(--bw) solid var(--outline);
+}
+.deadline { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.deadline svg { width: 20px; height: 20px; flex: none; }
+
+/* ── 分別辞典の品目一覧 ── */
+.kana-nav {
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.kana-nav a {
+  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  border: 2px solid var(--outline); background: var(--plate);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; text-decoration: none;
+}
+.kana-group { display: flex; flex-direction: column; gap: 8px; scroll-margin-top: 12px; }
+.jiten-link {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 48px; padding: 11px 14px; border-radius: 12px;
+  border: 2px solid var(--outline); background: var(--plate);
+  font-size: 15px; font-weight: 700; line-height: 1.45; text-decoration: none;
+}
+
+@media (hover: hover) {
+  .link-grid a:not([aria-current]):hover, .chip-links a:hover, .kana-nav a:hover,
+  .jiten-link:hover, a.pill-btn:hover { background: var(--ground); }
+}
+
+@media (min-width: 700px) {
+  .answer h1.plate-head { font-size: 24px; }
+  .answer-band { padding: 24px 20px; gap: 18px; }
+  .answer-band .disc { width: 78px; height: 78px; }
+  .answer-band .disc svg { width: 40px; height: 40px; }
+  .answer-cat { font-size: 40px; }
+  .kana-nav { flex-wrap: wrap; overflow: visible; }
+}
+
+@media (min-width: 1024px) {
+  .brand-link { flex: none; gap: 14px; }
+  .topnav a {
+    height: 44px; padding: 0 18px; border-radius: 999px;
+    border: 2px solid transparent; color: var(--on-brand);
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 700; text-decoration: none;
+  }
+  .topnav a svg { width: 20px; height: 20px; }
+  .topnav a.on { background: var(--plate); color: var(--text); border-color: var(--outline); }
+  .area-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+
+@media print {
+  .crumbs, .plate-foot .pill-btn, .chip-links, .narrow > a.pill-btn, .kana-nav, .search-box { display: none !important; }
+}

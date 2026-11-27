@@ -1,0 +1,647 @@
+/* 生成物。直接編集しないこと (index.template.html の <style> を build.py が書き出したもの) */
+  /* =====================================================================
+   * デザイン「集積所の看板」
+   * アプリアイコン(ティールの地・生成りのごみ箱・太い墨色の輪郭)を下敷きに、
+   * ごみ集積所の看板のような、太い輪郭の板と品目色の帯で組む。
+   * 主役は品目の4色。それ以外の色は墨・生成り・ティールに絞る。
+   * フォントは端末に入っているものだけを使う(Web フォントは読み込まない。
+   * 日本語フォントは重いうえ、外部サーバーへの通信が発生するため)。
+   * Windows では区の資料でも使われる BIZ UDPゴシック、Apple 端末ではヒラギノになる。
+   * ===================================================================== */
+  :root {
+    --ground: #efe7da;     /* ページの地 */
+    --plate: #fbf7ef;      /* 板(カード)の地 */
+    --text: #2f2c28;       /* 文字 */
+    --outline: #2f2c28;    /* 板の太い輪郭 */
+    --sub: #6a6358;        /* 補足の文字 */
+    --rule: #ddd3c3;       /* 板の中の細い区切り線 */
+    --brand: #0c7f72;      /* ヘッダーの帯・選択中のタブ */
+    --on-brand: #fbf7ef;
+    --today: #f3e1c0;      /* 今日の行・マス */
+    --sat: #2462a8;
+    --sun: #b23d19;
+    /* 品目色: --c-* は白文字を載せる塗り、--x-* は地の上に置く文字色 */
+    --c-burnable: #c8461f; --x-burnable: #a93a18;
+    --c-bottle: #1e7a45;   --x-bottle: #1e7a45;
+    --c-paper: #2462a8;    --x-paper: #2462a8;
+    --c-metal: #6d48ad;    --x-metal: #6d48ad;
+    --c-sodai: #8f5e0f;    --x-sodai: #8f5e0f;
+    --c-kyoten: #0b766a;   --x-kyoten: #0b766a;
+    --c-no: #7a4a2a;       --x-no: #7a4a2a;
+    --bw: 3px;             /* 板の輪郭の太さ */
+  }
+  /* ダークでも品目の塗り(--c-*)は同じ色のまま。白文字が載るので暗い地でも読める */
+  :root[data-theme="dark"] {
+    --ground: #1c1b18;
+    --plate: #272520;
+    --text: #eee7d9;
+    --outline: #6c6457;
+    --sub: #aba394;
+    --rule: #3b382f;
+    --brand: #0d6e63;
+    --on-brand: #f3ede1;
+    --today: #3d3224;
+    --sat: #86b8f2;
+    --sun: #ff9c7a;
+    --x-burnable: #ff9c7a; --x-bottle: #6bcb94; --x-paper: #86b8f2; --x-metal: #c2a8ee;
+    --x-sodai: #e0b45e;    --x-kyoten: #4fd1c1; --x-no: #d9a07c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Meiryo", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--ground);
+    color: var(--text);
+    line-height: 1.5;
+    /* 下部タブバーのぶん(PC ではタブバーを出さないので 0 に戻す) */
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+  button { font-family: inherit; color: inherit; cursor: pointer; }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+  /* 改行してよい位置で区切った語句。日本語はどの文字の間でも折り返すため、
+     「プラスチ|ック」のような改行を防ぐ。Safari が word-break: auto-phrase に
+     対応していないので、区切りは phrases() で手で入れている */
+  .ph { display: inline-block; }
+
+  /* 品目クラスを付けると --c(塗り)/ --x(文字色)が決まる */
+  .burnable          { --c: var(--c-burnable); --x: var(--x-burnable); }
+  .bottleCanPet      { --c: var(--c-bottle);   --x: var(--x-bottle); }
+  .paperPlastic      { --c: var(--c-paper);    --x: var(--x-paper); }
+  .metalCeramicGlass { --c: var(--c-metal);    --x: var(--x-metal); }
+  .cat-sodai         { --c: var(--c-sodai);    --x: var(--x-sodai); }
+  .cat-kyoten        { --c: var(--c-kyoten);   --x: var(--x-kyoten); }
+  .cat-no            { --c: var(--c-no);       --x: var(--x-no); }
+
+  /* ── ヘッダーの帯 ── */
+  .topbar {
+    background: var(--brand); color: var(--on-brand);
+    border-bottom: var(--bw) solid var(--outline);
+    padding-top: env(safe-area-inset-top);
+  }
+  .topbar-inner {
+    max-width: 760px; margin: 0 auto; padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .brand-icon {
+    width: 36px; height: 36px; border-radius: 9px; flex: none;
+    border: 2px solid var(--outline);
+  }
+  .brand { flex: 1; min-width: 0; }
+  .brand-title {
+    font-size: 17px; font-weight: 700; line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .topnav { display: none; }
+  .theme-btn {
+    flex: none; height: 44px; padding: 0 14px; border-radius: 999px;
+    border: 2px solid var(--on-brand); background: transparent; color: var(--on-brand);
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 700; white-space: nowrap;
+  }
+  .theme-btn svg { width: 18px; height: 18px; flex: none; }
+  /* スマホではアイコンだけにしてタイトルを切らさない(状態は aria-label で伝える) */
+  .theme-btn .tl { display: none; }
+  .theme-btn { width: 44px; padding: 0; justify-content: center; }
+
+  /* ── 下部タブバー(スマホ・タブレット) ── */
+  #tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: var(--plate); border-top: var(--bw) solid var(--outline);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #tabbar .inner { max-width: 760px; margin: 0 auto; display: flex; padding: 6px 4px; }
+  #tabbar button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    border: none; background: none; padding: 0;
+    color: var(--sub); font-size: 11px; font-weight: 700;
+  }
+  #tabbar .ti {
+    width: 56px; height: 32px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #tabbar .ti svg { width: 22px; height: 22px; }
+  #tabbar button.on { color: var(--text); }
+  #tabbar button.on .ti { background: var(--brand); color: var(--on-brand); }
+
+  /* ── ページの枠 ── */
+  .wrap {
+    max-width: 760px; margin: 0 auto; padding: 16px 16px 28px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  /* カレンダー以外の画面は、PC でも読みやすい幅に収める */
+  .narrow { width: 100%; max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .narrow.wide { max-width: 1280px; }
+  .page-title { font-size: 20px; font-weight: 700; line-height: 1.4; }
+  .page-sub { display: block; font-size: 13px; font-weight: 700; color: var(--sub); }
+  .section-title { font-size: 15px; font-weight: 700; color: var(--sub); margin-top: 6px; }
+
+  /* ── 板(看板) ── */
+  .plate {
+    background: var(--plate); border: var(--bw) solid var(--outline);
+    border-radius: 16px; overflow: hidden;
+  }
+  .plate-head {
+    padding: 10px 16px; font-size: 15px; font-weight: 700; line-height: 1.5;
+    border-bottom: var(--bw) solid var(--outline);
+  }
+  .card {
+    background: var(--plate); border: 2px solid var(--outline);
+    border-radius: 14px; padding: 14px 16px;
+  }
+
+  /* ── ボタン ── */
+  .pill-btn {
+    height: 44px; padding: 0 16px; border-radius: 999px;
+    border: 2px solid var(--outline); background: var(--plate); color: var(--text);
+    font-size: 14px; font-weight: 700; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none;
+  }
+  .pill-btn svg { width: 18px; height: 18px; flex: none; }
+  .circle-btn {
+    width: 44px; height: 44px; border-radius: 50%; padding: 0; flex: none;
+    border: 2px solid var(--outline); background: var(--plate); color: var(--text);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .circle-btn svg { width: 20px; height: 20px; }
+  .back-link {
+    align-self: flex-start; height: 44px; padding: 0 4px;
+    display: inline-flex; align-items: center; gap: 4px;
+    border: none; background: none; font-size: 15px; font-weight: 700;
+  }
+  .back-link svg { width: 18px; height: 18px; }
+  @media (hover: hover) {
+    .pill-btn:hover, .circle-btn:hover, .opt-grid button:hover,
+    .opt-list button:hover, .menu-list button:hover { background: var(--ground); }
+  }
+
+  /* ── カレンダー画面の配置 ──
+     スマホ: 地域 → 今日(次)の収集 → カレンダー → 収集する曜日 の1列。
+     PC: 左に地域・今日の収集・収集する曜日、右にカレンダーの2列。
+     DOM は PC の並びで組み、スマホでは .cal-side を display: contents に
+     して中身を1列に並べ替える */
+  .cal-layout { display: flex; flex-direction: column; gap: 16px; }
+  .cal-side { display: contents; }
+  .area-row { order: 1; }
+  .hero { order: 2; }
+  .cal-main { order: 3; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .weekly { order: 4; }
+
+  .area-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .area-label {
+    flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 6px;
+    font-size: 16px; font-weight: 700; line-height: 1.45;
+  }
+  .area-label svg { width: 20px; height: 20px; flex: none; margin-top: 1px; }
+
+  /* 今日(または次)の収集の看板 */
+  .hero .bands { display: flex; flex-direction: column; }
+  .hero .band {
+    display: flex; align-items: center; gap: 14px;
+    padding: 20px 16px; background: var(--c); color: #fff;
+  }
+  .hero .band + .band { border-top: 2px solid var(--outline); }
+  .hero .disc {
+    width: 62px; height: 62px; border-radius: 50%; flex: none;
+    background: #fbf7ef; color: var(--c); border: var(--bw) solid var(--outline);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero .disc svg { width: 32px; height: 32px; }
+  .hero .name { font-size: 34px; font-weight: 700; line-height: 1.25; min-width: 0; }
+  .hero .name.mid { font-size: 28px; }
+  .hero .name.long { font-size: 24px; }
+  .hero .foot {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    border-top: var(--bw) solid var(--outline); font-size: 17px; font-weight: 700;
+  }
+  .hero .foot svg { width: 22px; height: 22px; flex: none; }
+
+  /* 収集する曜日の看板 */
+  .weekly { display: flex; flex-direction: column; }
+  .wk-row { display: flex; align-items: stretch; }
+  .wk-row + .wk-row { border-top: 2px solid var(--outline); }
+  .wk-day {
+    width: 104px; flex: none; padding: 10px 12px;
+    border-right: 2px solid var(--outline);
+    display: flex; flex-direction: column; justify-content: center;
+    font-size: 19px; font-weight: 700; line-height: 1.3;
+  }
+  .wk-day small { font-size: 12px; }
+  .wk-cat {
+    flex: 1; min-width: 0; padding: 11px 12px; background: var(--c); color: #fff;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 700; line-height: 1.4;
+  }
+  .wk-cat svg { width: 20px; height: 20px; flex: none; }
+
+  /* カレンダーの操作部分。スマホでは切り替えを上、月の移動を下に置く */
+  .cal-tools { display: flex; flex-direction: column; gap: 12px; }
+  .cal-tools .seg { order: -1; }
+  .cal-title { display: none; font-size: 22px; font-weight: 700; }
+  .seg {
+    display: flex; border: var(--bw) solid var(--outline); border-radius: 999px;
+    overflow: hidden; background: var(--plate);
+  }
+  .seg button {
+    flex: 1; height: 44px; border: none; background: transparent;
+    font-size: 15px; font-weight: 700;
+  }
+  .seg button.on { background: var(--text); color: var(--plate); }
+  /* 幅360pxほどの狭い端末では、今日へ・印刷が次の行の右端に回る */
+  .cal-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 8px; }
+  .cal-head .title { font-size: 18px; font-weight: 700; white-space: nowrap; }
+  .cal-head .tools { margin-left: auto; display: flex; gap: 6px; }
+  .cal-head .tools .pill-btn { padding: 0 12px; }
+  /* スマホでは印刷ボタンをアイコンだけにして1行に収める */
+  .print-btn { width: 44px; padding: 0; }
+  .print-label { display: none; }
+
+  /* 2週間の予定 */
+  .sched-row {
+    display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+    border-top: 1.5px solid var(--rule);
+  }
+  .sched-row:first-child { border-top: none; }
+  .sched-row.is-today { background: var(--today); }
+  .sched-date { width: 86px; flex: none; font-size: 18px; font-weight: 700; white-space: nowrap; }
+  .sched-date .wd { font-size: 13px; color: var(--sub); }
+  .sched-date .wd.sat { color: var(--sat); }
+  .sched-date .wd.sun { color: var(--sun); }
+  .sched-items { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .sched-none { font-size: 14px; color: var(--sub); }
+  .tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 700; line-height: 1.35; color: var(--x);
+  }
+  .tag .sq {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    background: var(--c); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tag .sq svg { width: 16px; height: 16px; }
+  .today-pill {
+    flex: none; font-size: 12px; font-weight: 700; line-height: 1.4;
+    padding: 3px 9px; border-radius: 999px; background: var(--text); color: var(--plate);
+  }
+
+  /* 月間カレンダー */
+  table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.cal th {
+    font-size: 13px; font-weight: 700; padding: 8px 0;
+    border-bottom: var(--bw) solid var(--outline);
+  }
+  table.cal th.sun { color: var(--sun); }
+  table.cal th.sat { color: var(--sat); }
+  /* height は最低値。PC では fitCalendar() が表全体の高さを入れ、行が均等に伸びる */
+  table.cal td {
+    vertical-align: top; text-align: center; height: 76px; padding: 4px 3px;
+    border-top: 1.5px solid var(--rule); border-right: 1.5px solid var(--rule);
+  }
+  table.cal tbody tr:first-child td { border-top: none; }
+  table.cal td:last-child { border-right: none; }
+  table.cal td .d {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 24px; height: 24px; padding: 0 5px; border-radius: 999px;
+    font-size: 13px; font-weight: 700;
+  }
+  table.cal td.sun .d { color: var(--sun); }
+  table.cal td.sat .d { color: var(--sat); }
+  /* 前後の月の日: 日付・収集予定とも出すが、薄くして参考扱いとわかるように */
+  table.cal td.other { opacity: .42; }
+  table.cal td.today { background: var(--today); }
+  table.cal td.today .d { background: var(--text); color: var(--plate); }
+  .cal-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    margin-top: 4px; padding: 4px 2px 5px; border-radius: 7px;
+    background: var(--c); color: #fff; text-align: center;
+  }
+  .cal-item svg { width: 15px; height: 15px; flex: none; }
+  .cal-item .cl { font-size: 10px; font-weight: 700; line-height: 1.25; }
+  /* マスには短い名前を出す(正式名は同じ画面の「収集する曜日」にある)。
+     正式名は印刷用。紙には「収集する曜日」が載らないため */
+  .cl-full { display: none; }
+
+  /* ── 地域選択 ── */
+  .opt-grid { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
+  .opt-grid button {
+    min-height: 44px; padding: 8px 16px; border-radius: 12px;
+    border: 2px solid var(--outline); background: var(--plate);
+    font-size: 15px; font-weight: 700;
+  }
+  .opt-list { display: flex; flex-direction: column; gap: 8px; padding: 14px; }
+  .opt-list button {
+    padding: 12px 14px; border-radius: 12px; text-align: left; line-height: 1.5;
+    border: 2px solid var(--outline); background: var(--plate); font-size: 15px;
+  }
+  .opt-list button .zone-note { display: block; font-size: 12px; color: var(--sub); margin-top: 3px; }
+
+  /* ── 開閉する項目(details) ── */
+  details.acc {
+    background: var(--plate); border: 2px solid var(--outline);
+    border-radius: 12px; overflow: hidden;
+  }
+  details.acc > summary {
+    list-style: none; cursor: pointer; min-height: 48px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 11px 14px; font-size: 15px; font-weight: 700; line-height: 1.45;
+  }
+  details.acc > summary::-webkit-details-marker { display: none; }
+  details.acc > summary::after {
+    content: ""; flex: none; width: 8px; height: 8px; margin-left: 2px;
+    border-right: 2.5px solid var(--text); border-bottom: 2.5px solid var(--text);
+    transform: rotate(45deg); transition: transform .15s;
+  }
+  details.acc[open] > summary::after { transform: rotate(-135deg); }
+  details.acc .acc-body {
+    padding: 12px 14px 14px; font-size: 14px; line-height: 1.7;
+    border-top: 1.5px solid var(--rule);
+  }
+  .rich { word-break: break-word; }
+  .rich a { color: var(--text); }
+  .acc-list { display: flex; flex-direction: column; gap: 8px; }
+
+  /* ── 分別辞典 ── */
+  .search-box {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--plate); border: var(--bw) solid var(--outline);
+    border-radius: 14px; padding: 10px 14px;
+  }
+  .search-box svg { width: 20px; height: 20px; flex: none; }
+  .search-box input {
+    flex: 1; min-width: 0; border: none; background: none; color: var(--text);
+    font-size: 16px; font-family: inherit; outline: none;
+  }
+  .search-box:focus-within { outline: 3px solid var(--text); outline-offset: 2px; }
+  .cat-chips {
+    display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cat-chips button {
+    flex: none; height: 38px; padding: 0 14px; border-radius: 999px;
+    border: 2px solid var(--outline); background: var(--plate);
+    font-size: 13px; font-weight: 700; white-space: nowrap;
+  }
+  .cat-chips button.on { background: var(--text); color: var(--plate); }
+  .jiten-list { display: flex; flex-direction: column; gap: 8px; }
+  .jiten-count { font-size: 13px; color: var(--sub); }
+  .kana-header {
+    font-size: 15px; font-weight: 700; padding: 10px 2px 2px;
+    border-bottom: 2px solid var(--outline);
+  }
+  .jiten-badge {
+    flex: none; font-size: 11px; font-weight: 700; line-height: 1.4;
+    padding: 3px 8px; border-radius: 6px; background: var(--c); color: #fff;
+    white-space: nowrap;
+  }
+  .jiten-name { flex: 1; min-width: 0; }
+  .detail-label { font-size: 12px; font-weight: 700; color: var(--sub); margin: 8px 0 3px; }
+  .detail-label:first-child { margin-top: 0; }
+
+  /* ── 便利帳 ── */
+  .benri-img { width: 100%; border-radius: 8px; display: block; }
+  .benri-links { margin-top: 10px; font-size: 13px; }
+  .benri-links a { word-break: break-all; }
+
+  /* ── メニュー ── */
+  .menu-list { display: flex; flex-direction: column; gap: 8px; }
+  .menu-list button {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 56px; padding: 12px 16px; border-radius: 14px; text-align: left;
+    border: var(--bw) solid var(--outline); background: var(--plate);
+    font-size: 16px; font-weight: 700; line-height: 1.45;
+  }
+  .menu-list button::after {
+    content: ""; flex: none; width: 9px; height: 9px;
+    border-right: 2.5px solid var(--text); border-bottom: 2.5px solid var(--text);
+    transform: rotate(-45deg);
+  }
+  .menu-list .menu-note { display: block; font-size: 12px; font-weight: 400; color: var(--sub); margin-top: 2px; }
+  .contact-title { font-size: 16px; font-weight: 700; }
+  .contact-org { font-size: 13px; color: var(--sub); margin-top: 1px; }
+  .snapshot-note {
+    font-size: 13px; line-height: 1.7; padding: 12px 14px;
+    border: 2px dashed var(--outline); border-radius: 12px;
+  }
+
+  /* ── ページ下部: アプリへの案内と注意書き ── */
+  .site-foot {
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    padding-top: 8px; text-align: center;
+  }
+  .promo {
+    display: flex; align-items: center; gap: 18px;
+    background: var(--plate); border: var(--bw) solid var(--outline); border-radius: 16px;
+    padding: 10px 12px 10px 20px;
+  }
+  .promo-link {
+    display: flex; align-items: center; gap: 16px; text-decoration: none;
+  }
+  .promo-title { font-size: 16px; font-weight: 700; white-space: nowrap; }
+  .promo-icon {
+    display: block; width: 52px; height: 52px; border-radius: 12px; flex: none;
+    border: 2px solid var(--outline);
+  }
+  /* QR はマウスで操作する端末(PC)だけ。スマホでは自分の画面の QR を読めない。
+     PC でもウィンドウが狭いと札が横にはみ出すので、幅に余裕があるときだけ */
+  .promo-qr {
+    display: none; width: 92px; height: 92px; flex: none;
+    border: 2px solid var(--outline); border-radius: 8px; background: #fff;
+  }
+  @media (hover: hover) and (pointer: fine) and (min-width: 600px) {
+    .promo-qr { display: block; }
+  }
+  .legal { font-size: 12px; line-height: 1.8; color: var(--sub); }
+  .legal a { color: var(--text); }
+  /* 町名別・分別辞典などの静的ページ(pages.py が書き出す)へのリンク。検索エンジンが
+     ここからたどれるよう、本体のどの画面の下にも出す */
+  .foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 16px; }
+
+  /* ── タブレット以上 ── */
+  @media (min-width: 700px) {
+    .brand-title { font-size: 19px; }
+    .theme-btn { width: auto; padding: 0 14px; }
+    .theme-btn .tl { display: inline; }
+    .cal-head { gap: 8px; }
+    .cal-head .tools { gap: 8px; }
+    .cal-head .tools .pill-btn { padding: 0 16px; }
+    .print-btn { width: auto; padding: 0 16px; }
+    .print-label { display: inline; }
+    .cal-head .title { font-size: 22px; }
+    table.cal th { font-size: 14px; padding: 10px 0; }
+    table.cal td { height: 96px; padding: 7px; text-align: left; }
+    table.cal td .d { font-size: 15px; min-width: 28px; height: 28px; padding: 0 6px; }
+    .cal-item {
+      flex-direction: row; align-items: center; text-align: left;
+      gap: 6px; margin-top: 6px; padding: 6px 7px; border-radius: 8px;
+    }
+    .cal-item .cl { font-size: 12px; line-height: 1.3; }
+    .page-title { font-size: 24px; }
+    .cat-chips { flex-wrap: wrap; overflow: visible; }
+  }
+
+  /* ── PC: 上にメニュー、カレンダー画面は2列 ── */
+  @media (min-width: 1024px) {
+    body { padding-bottom: 0; }
+    #tabbar { display: none; }
+    .topbar-inner { max-width: 1680px; padding: 12px 40px; gap: 14px; }
+    .brand-icon { width: 42px; height: 42px; border-radius: 11px; }
+    .brand { flex: none; }
+    .topnav { display: flex; gap: 6px; margin-left: auto; }
+    .topnav button {
+      height: 44px; padding: 0 18px; border-radius: 999px;
+      border: 2px solid transparent; background: none; color: var(--on-brand);
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 15px; font-weight: 700;
+    }
+    .topnav button svg { width: 20px; height: 20px; }
+    .topnav button.on { background: var(--plate); color: var(--text); border-color: var(--outline); }
+    .wrap { max-width: 1680px; padding: 28px 40px 40px; gap: 24px; }
+
+    .cal-layout { flex-direction: row; align-items: stretch; gap: 28px; }
+    .cal-side { display: flex; flex-direction: column; gap: 16px; flex: 0 1 420px; min-width: 340px; }
+    .cal-main { flex: 1 1 0; }
+    /* 右のカレンダーが高いときは、左の看板2枚が伸びて下端を揃える */
+    .cal-side .hero, .cal-side .weekly { flex: 1 1 auto; display: flex; flex-direction: column; }
+    .hero .bands { flex: 1; }
+    .hero .band { flex: 1; }
+    .wk-row { flex: 1; }
+
+    .cal-tools { flex-direction: row; align-items: center; flex-wrap: wrap; }
+    .cal-tools .seg { order: 0; margin-left: auto; }
+    .seg button { flex: none; width: 108px; }
+    .cal-title { display: block; }
+    .cal-head .title { font-size: 26px; }
+    .cal-head .tools { margin-left: 8px; }
+
+    .jiten-list, .acc-grid, .menu-list {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start; gap: 8px 12px;
+    }
+    .jiten-count, .kana-header { grid-column: 1 / -1; }
+  }
+
+  /* ── 大きな画面では文字も一段大きく ── */
+  @media (min-width: 1500px) {
+    .cal-side { flex-basis: 480px; }
+    .hero .disc { width: 78px; height: 78px; }
+    .hero .disc svg { width: 40px; height: 40px; }
+    .hero .name { font-size: 44px; }
+    .hero .name.mid { font-size: 36px; }
+    .hero .name.long { font-size: 32px; }
+    .hero .foot { font-size: 19px; }
+    .wk-day { font-size: 22px; width: 116px; }
+    .wk-cat { font-size: 17px; }
+    .cal-head .title { font-size: 30px; }
+    table.cal th { font-size: 15px; }
+    table.cal td { padding: 9px; }
+    table.cal td .d { font-size: 17px; min-width: 32px; height: 32px; }
+    .cal-item { padding: 8px 9px; }
+    .cal-item svg { width: 18px; height: 18px; }
+    .cal-item .cl { font-size: 14px; }
+  }
+
+  /* ── 範囲印刷のダイアログ ── */
+  #printDialog {
+    border: var(--bw) solid var(--outline); border-radius: 16px;
+    background: var(--plate); color: var(--text);
+    padding: 20px; width: min(360px, calc(100vw - 48px));
+    font-family: inherit;
+    /* 全称セレクタの margin:0 リセットが UA の中央寄せ(margin:auto)を
+       打ち消してしまうため明示的に戻す */
+    margin: auto;
+  }
+  #printDialog::backdrop { background: rgba(0, 0, 0, .45); }
+  .dlg-title { font-size: 17px; font-weight: 700; margin-bottom: 14px; }
+  .dlg-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; font-weight: 700; }
+  #printUntil {
+    font-size: 15px; font-weight: 700; font-family: inherit;
+    height: 44px; padding: 0 10px; border-radius: 10px;
+    border: 2px solid var(--outline); background: var(--plate); color: var(--text);
+  }
+  .dlg-note { font-size: 13px; color: var(--sub); margin-top: 10px; }
+  .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .dlg-actions .primary { background: var(--text); color: var(--plate); }
+  /* 印刷専用コンテナは画面には出さない */
+  #printRange { display: none; }
+
+  /* ── 印刷: カレンダー(または表示中のリスト)だけを紙に出す ──
+     ダークモード中でも紙は白なので、印刷時はライト配色を強制する */
+  /* 印刷CSSの寸法計算は「余白10mm」を前提にしているため、ここで固定する
+     (ブラウザ既定の余白は環境によりまちまちで、広いと表が次ページに割れる) */
+  @page { margin: 10mm; }
+  @media print {
+    :root, :root[data-theme="dark"] {
+      --ground: #fff; --plate: #fff; --text: #1a1a1a; --outline: #1a1a1a;
+      --sub: #555; --rule: #bbb; --today: #fff;
+      --sat: #2264ad; --sun: #b23d19;
+      --x-burnable: #a93a18; --x-bottle: #1e7a45; --x-paper: #2462a8; --x-metal: #6d48ad;
+    }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background: #fff; padding: 0; }
+    .topbar, #tabbar, .hero, .weekly, .seg, .site-foot, .cal-title,
+    .cal-head .circle-btn, .cal-head .tools, .area-row .pill-btn, .today-pill { display: none !important; }
+    .wrap { max-width: none; padding: 0; display: block; }
+    .cal-layout, .cal-side, .cal-main, .cal-tools { display: block; }
+    .area-row { margin-bottom: 3mm; }
+    .area-label { font-size: 10pt; }
+    .area-label svg { width: 4mm; height: 4mm; }
+    .cal-head { justify-content: center; margin-bottom: 4mm; }
+    .cal-head .title { font-size: 14pt; }
+    .plate { border: none; border-radius: 0; background: none; overflow: visible; }
+
+    /* 印刷時のカレンダー寸法は画面用(大きな画面向けの拡大指定を含む)を上書きする。
+       テーブル自体に「A4の印刷可能領域からヘッダー分を引いた高さ」をmm指定する
+       ことで、行が均等に引き伸ばされて用紙いっぱいに印刷される。
+       (縦長→A4縦: 277mm−ヘッダー≈17mm → 252mm / 横長→A4横: 190mm−17mm → 166mm) */
+    /* fitCalendar() が画面用にインラインstyleで高さを入れるため、
+       印刷時は !important で用紙サイズの高さを優先させる。
+       高さは下の orientation メディアクエリで用紙の向きに合わせて決まる */
+    table.cal { page-break-inside: avoid; }
+    table.cal td { height: auto; padding: 1.5mm 1mm; text-align: center; }
+    table.cal td .d { font-size: 12pt; min-width: 0; height: auto; padding: 0; }
+    table.cal th { font-size: 10pt; padding: 1.5mm 0; }
+    /* 紙のカレンダーらしく全セルに罫線を引く */
+    table.cal td, table.cal th { border: 0.5pt solid #999; }
+    /* 紙では塗りつぶしをやめ、淡い色の地に品目色の文字にしてインクを節約する */
+    .cal-item {
+      flex-direction: column; align-items: center; text-align: center;
+      padding: 1mm 0.6mm 1.2mm; margin-top: 1mm; gap: 0.5mm; border-radius: 1.5mm;
+      background: color-mix(in srgb, var(--c) 14%, #fff); color: var(--c);
+    }
+    .cal-item svg { width: 4.5mm; height: 4.5mm; }
+    .cal-item .cl { font-size: 8pt; }
+    .cl-short { display: none; }
+    .cl-full { display: block; }
+
+    /* 「今日」の印は印刷しない(月をまたいで使う紙なので意味を持たない) */
+    table.cal td.today { background: none; }
+    table.cal td.today .d { background: none; color: inherit; }
+    table.cal td.sun .d { color: var(--sun); }
+    table.cal td.sat .d { color: var(--sat); }
+    .sched-row.is-today { background: none; }
+
+    /* 範囲印刷(印刷ボタンで月数を指定した場合): 画面の内容の代わりに
+       #printRange に生成した各月のカレンダーを1か月1枚で印刷する */
+    body.print-multi #app { display: none !important; }
+    body.print-multi #printRange { display: block; }
+    .print-page { page-break-after: always; }
+    .print-page:last-child { page-break-after: auto; }
+    .print-page .area-name { font-size: 10pt; margin-bottom: 3mm; }
+    .print-page .cal-head { display: flex; }
+  }
+  /* 印刷設定で選んだ用紙の向きに追従して、どちらでも1枚いっぱいに広げる。
+     印刷時のメディアクエリは「用紙」の縦横で評価される。
+     (A4・余白10mm想定: 縦=277mm、横=190mm からヘッダー分を引いた高さ)
+     テーブルの余り高さは内容の多い行ほど多く配分されてしまい、収集のない
+     週がぺしゃんこになるため、各セルにも「(テーブル高さ − 曜日行) ÷ 週数」
+     の均等な高さを指定して全行を同じ高さに揃える。週数(4〜6)は
+     calTableHtml() がテーブルの style="--weeks:n" で渡してくる。 */
+  @media print and (orientation: portrait) {
+    table.cal { height: 252mm !important; }
+    table.cal td { height: calc(242mm / var(--weeks, 5)); }
+  }
+  @media print and (orientation: landscape) {
+    table.cal { height: 166mm !important; }
+    table.cal td { height: calc(156mm / var(--weeks, 5)); }
+  }

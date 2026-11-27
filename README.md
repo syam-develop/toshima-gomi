@@ -11,12 +11,15 @@ GitHub Pages で公開している単一ページの Web アプリ。
 
 | ファイル | 役割 |
 |---|---|
-| `toshima-gomi.json` | **収集曜日データ**(公式ごみ分別アプリWeb版の収集日カレンダーから作る)。ページ起動時に fetch で読み込む |
-| `app-data.json` | 公式ごみ分別アプリWeb版のスナップショット(分別辞典774品目・FAQ・連絡先・便利帳画像) |
+| `toshima-gomi.json` | **収集曜日データ**(公式ごみ分別アプリWeb版の収集日カレンダーから作る)。ページ起動時に fetch で読み込む。町名ページもここから作るので、変えたら build.py を再実行する |
+| `app-data.json` | 公式ごみ分別アプリWeb版のスナップショット(分別辞典774品目・FAQ・連絡先・便利帳画像)。便利帳画像は data URI で持ち、build.py が `benri/` に画像ファイルとして書き出す |
 | `crawl.py` | 公式Web版を再クロールして `app-data.json` と `toshima-gomi.json` を作り直す |
 | `index.template.html` | ページ本体のテンプレート(CSS/JS 含む) |
-| `build.py` | `index.template.html` + `app-data.json` → `index.html` を生成 |
+| `build.py` | `index.template.html` + `app-data.json` → `index.html` を生成し、続けて `pages.py` で静的ページを書き出す |
 | `index.html` | **生成物。直接編集しないこと**(build.py で上書きされる) |
+| `pages.py` | 検索の入口になる静的ページ(町名別・品目別・よくある質問)と `sitemap.xml` を書き出す。くわしくは下の「検索の入口になるページ」 |
+| `pages.css` | 静的ページだけで使う CSS(手で書くもの)。共通の部品は `site.css` |
+| `area/` `jiten/` `faq/` `benri/` `site.css` `sitemap.xml` | **生成物。直接編集しないこと。** build.py を実行するたびに消して作り直すので、手でファイルを置かないこと |
 | `googlec85bd6fe5bbf1558.html` | Google Search Console の所有権確認ファイル。**消さないこと**(消すと確認が外れ、検索での表示回数・クリック数が見られなくなる) |
 | `app-icon.png` | iOS版のアプリアイコン(180px)。ヘッダー・ファビコン・アプリへの案内で使う。iOS版のアイコンを変えたら `sips -Z 180 ../ToshimaGomiApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png --out app-icon.png` で作り直す |
 | `appstore-qr.svg` | iOS版の App Store ページの QR コード(PC の画面下部に出す)。`../scripts/make-appstore-qr.swift` で作ったもので、読み取って URL と一致することまで確かめてある。App Store の URL が変わったら作り直す |
@@ -43,7 +46,7 @@ GitHub Pages で公開している単一ページの Web アプリ。
 ```sh
 python3 crawl.py --dry-run   # 公式Web版を取得し、前回からの変更点を表示(書き込まない)
 python3 crawl.py             # 問題なければ app-data.json と toshima-gomi.json を上書き
-python3 build.py             # index.html を再生成
+python3 build.py             # index.html と静的ページを再生成
 ```
 
 を実行し、続けて iOS版にも反映してから(`../README.md` の「公式データの更新手順」)、
@@ -72,10 +75,35 @@ python3 build.py             # index.html を再生成
 ### テンプレート(index.template.html)を変更した場合
 
 ```sh
-python3 build.py   # index.html を再生成
+python3 build.py   # index.html と静的ページを再生成
 ```
 
-を実行してから、コミットして公開する。
+を実行してから、コミットして公開する。CSS を変えた場合も、静的ページが読む `site.css` が
+作り直されるので同じ手順でよい。
+
+## 検索の入口になるページ
+
+本体(`index.html`)は1枚の HTML を JavaScript で描き分けていて、画面ごとの URL が無い。
+そのままでは検索エンジンから「町名を選んでください」の1画面にしか見えないので、
+同じデータから静的な HTML を書き出して、検索の入口にしている(`pages.py`)。
+
+| URL | 中身 | 狙う検索 |
+|---|---|---|
+| `area/<町名>.html` | 町名ごとの収集する曜日(丁目・番地で分かれる地域をまとめて載せる) | 「池袋3丁目 ごみの日」など |
+| `jiten/<品目>.html` | 品目ごとの分別区分・注意事項・出す日(または申し込み先)・区の資料 | 「豊島区 スプレー缶 捨て方」など |
+| `area/` `jiten/` `faq/` | 町名の一覧・品目の一覧(検索つき)・よくある質問 | |
+
+- **載せるのは公式データにある情報だけ。** 品目ページの「出す日」や連絡先も `app-data.json` /
+  `toshima-gomi.json` から作る。自分で書いた説明を足すときは、公式の情報と食い違わないか確かめる
+- 品目ページのファイル名は品目名のハッシュ(先頭8桁)。品目名が変わらない限り URL も変わらない。
+  公式側で品目名が変わると URL が変わり、古い URL は消える
+- 見た目の部品は本体と同じ。`index.template.html` の CSS を `site.css` として書き出して読み、
+  静的ページにしか無い部品だけ `pages.css` に書いている
+- 町名ページの「この地域のカレンダーを開く」は `../?area=<地域ID>` へのリンク。本体はこれを
+  受け取ると、その地域を選んだ状態でカレンダーを開く(URL からは `?area=` を消す)
+- 本体のどの画面の下にも、これらのページへのリンクを出している(検索エンジンがたどれるように)
+- `sitemap.xml` は Google Search Console の「サイトマップ」に `https://syam-develop.github.io/toshima-gomi/sitemap.xml`
+  を登録して使う。一度登録すれば、ページが増減しても build.py で作り直して公開するだけでよい
 
 ## ローカルでの動作確認
 
